@@ -252,11 +252,16 @@ func (k *Knowledge) BeforeCreate(tx *gorm.DB) (err error) {
 
 // ManualKnowledgeMetadata stores metadata for manual Markdown knowledge content.
 type ManualKnowledgeMetadata struct {
-	Content   string `json:"content"`
-	Format    string `json:"format"`
-	Status    string `json:"status"`
-	Version   int    `json:"version"`
-	UpdatedAt string `json:"updated_at"`
+	Content        string   `json:"content"`
+	Format         string   `json:"format"`
+	Status         string   `json:"status"`
+	Version        int      `json:"version"`
+	IndexedVersion int      `json:"indexed_version,omitempty"`
+	UpdatedAt      string   `json:"updated_at"`
+	SyncSource     string   `json:"sync_source,omitempty"`
+	ExternalUserID string   `json:"external_user_id,omitempty"`
+	DocumentDate   string   `json:"document_date,omitempty"`
+	SyncEventIDs   []string `json:"sync_event_ids,omitempty"`
 }
 
 // ManualKnowledgePayload represents the payload for manual knowledge operations.

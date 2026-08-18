@@ -52,6 +52,9 @@ func (s *sessionService) resolveKnowledgeBases(
 	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, requestedKBIDs, req.KnowledgeIDs); err != nil {
 		return nil, nil, err
 	}
+	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, req.TagScopes); err != nil {
+		return nil, nil, err
+	}
 	kbIDs, err = types.FilterKnowledgeBasesForTenantAPIKeyScope(ctx, requestedKBIDs, kbIDs)
 	if err != nil {
 		return nil, nil, err

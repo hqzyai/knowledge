@@ -123,6 +123,57 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
 
 ## API Key 与 API 主体
 
+### POST /api/v1/external-users
+
+用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10001`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，并将知识库白名单预绑定到该用户可能创建的 Hermes 对话知识库 ID。
+
+权限：空间 `10001` 的 Owner JWT，或该空间已有的 Full Access API Key。接口不会接受其它空间的凭证。
+
+请求：
+
+```json
+{
+  "user_id": "hermes-user-123",
+  "username": "hermes_user_123",
+  "email": "user123@example.com",
+  "password": "Hermes123456"
+}
+```
+
+密码必须为 8–32 个字符并同时包含字母和数字。相同 `user_id`、用户名和邮箱的重试具有幂等性：不会重复创建账号或 API Key，并返回 HTTP 200；首次创建返回 HTTP 201。若相同 `user_id` 携带了不同用户名或邮箱，则返回 409。
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "external_user_id": "hermes-user-123",
+    "user_id": "9f8f...",
+    "username": "hermes_user_123",
+    "email": "user123@example.com",
+    "space_id": 10001,
+    "role": "contributor",
+    "api_key_id": 91,
+    "api_key": "sk-...",
+    "full_access": false,
+    "capabilities": ["chat", "retrieve", "read_agents"],
+    "knowledge_base_ids": ["..."],
+    "user_created": true,
+    "api_key_created": true
+  }
+}
+```
+
+注意：用户登录后的“编辑”权限默认进入“我创建的知识库”，并只能编辑自己创建的知识库。返回的 API Key 不能管理空间、成员、模型或知识库生命周期；问答与检索还会受到 `knowledge_base_ids` 白名单限制。`/conversation-sync` 是例外：它只要求 API Key 有效，不检查 capability 或知识库白名单。
+
+```bash
+curl -X POST "$BASE/api/v1/external-users" \
+  -H "X-API-Key: $ADMIN_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"hermes-user-123","username":"hermes_user_123","email":"user123@example.com","password":"Hermes123456"}'
+```
+
 ### GET /api/v1/tenants/:id/api-keys
 
 用途：列出空间 API key（掩码显示）。权限：Owner，仅 JWT（API key 默认拒绝）。Handler: `internal/handler/tenant.go`

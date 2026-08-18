@@ -39,7 +39,12 @@ func escapeLikeKeyword(keyword string) string {
 // counter jump back up and never reach zero (the "stuck
 // pending_subtasks_count / never promoted to completed" bug). Omitting
 // the column here means Save can never touch it.
-var omitFieldsOnUpdate = []string{"DeletedAt", "PendingSubtasksCount"}
+// Metadata is also omitted: parse/enrichment workers keep a Knowledge snapshot
+// in memory while doing slow model calls. A concurrent manual edit may publish
+// a newer metadata.content/version during that time; letting the stale worker
+// Save its whole snapshot would silently erase the newer text. Authoring paths
+// persist metadata explicitly (or through CompareAndSwapKnowledgeMetadata).
+var omitFieldsOnUpdate = []string{"DeletedAt", "PendingSubtasksCount", "Metadata"}
 
 // knowledgeRepository implements knowledge base and knowledge repository interface
 type knowledgeRepository struct {
@@ -530,6 +535,38 @@ func (r *knowledgeRepository) UpdateKnowledgeColumns(
 		return nil
 	}
 	return r.db.WithContext(ctx).Model(&types.Knowledge{}).Where("id = ?", id).Updates(values).Error
+}
+
+// CompareAndSwapKnowledgeMetadata atomically publishes a new manual-content
+// revision. PostgreSQL stores metadata as JSONB, so its comparison needs an
+// explicit jsonb cast; SQLite stores the same value as canonical JSON text.
+func (r *knowledgeRepository) CompareAndSwapKnowledgeMetadata(
+	ctx context.Context,
+	tenantID uint64,
+	id string,
+	expected types.JSON,
+	replacement types.JSON,
+	values map[string]interface{},
+) (bool, error) {
+	updates := make(map[string]interface{}, len(values)+1)
+	for key, value := range values {
+		updates[key] = value
+	}
+	updates["metadata"] = replacement
+
+	query := r.db.WithContext(ctx).
+		Model(&types.Knowledge{}).
+		Where("tenant_id = ? AND id = ?", tenantID, id)
+	if r.db.Dialector.Name() == "postgres" {
+		query = query.Where("metadata = CAST(? AS jsonb)", expected.ToString())
+	} else {
+		query = query.Where("json(metadata) = json(?)", expected.ToString())
+	}
+	result := query.Updates(updates)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
 
 // UpdateActiveDeletingKnowledgeColumns only touches rows that are still visible

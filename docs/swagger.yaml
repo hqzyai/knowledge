@@ -645,6 +645,46 @@ definitions:
         description: 'Summarize threshold: number of messages before summarization'
         type: integer
     type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncRequest:
+    properties:
+      conversation_at:
+        type: string
+      event_id:
+        type: string
+      qa_content:
+        type: string
+      user_id:
+        type: string
+    required:
+    - qa_content
+    - user_id
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncResult'
+      success:
+        type: boolean
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncResult:
+    properties:
+      content_version:
+        type: integer
+      document_created:
+        type: boolean
+      document_date:
+        type: string
+      idempotent_replay:
+        type: boolean
+      knowledge_base_created:
+        type: boolean
+      knowledge_base_id:
+        type: string
+      knowledge_id:
+        type: string
+      parse_status:
+        type: string
+    type: object
   github_com_Tencent_WeKnora_internal_types.CreateOrganizationRequest:
     properties:
       avatar:
@@ -671,6 +711,27 @@ definitions:
     properties:
       weknoracloud:
         $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.WeKnoraCloudCredentials'
+    type: object
+  github_com_Tencent_WeKnora_internal_types.CubeSandboxConfig:
+    properties:
+      api_key:
+        description: 加密
+        type: string
+      api_url:
+        type: string
+      cube_sandbox_ttl_seconds:
+        type: integer
+      http_timeout_sec:
+        description: |-
+          HTTPTimeoutSec bounds each HTTP call to the sandbox control plane.
+          0 means use the built-in default (30s), never the deployment's value.
+        type: integer
+      proxy_url:
+        type: string
+      sandbox_domain:
+        type: string
+      template_id:
+        type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.CustomAgentConfig:
     properties:
@@ -895,6 +956,17 @@ definitions:
       rewrite_prompt_user:
         description: Rewrite prompt user message template
         type: string
+      sandbox_config_id:
+        description: |-
+          ===== Sandbox Settings =====
+          SandboxConfigID selects which workspace sandbox config this agent's
+          skill scripts run on. Empty means the deployment-wide
+          WEKNORA_SANDBOX_* defaults.
+
+          This references the LOGICAL config, never a specific revision: keeping
+          the indirection here is what would let credential rotation happen
+          without re-pointing every agent (see the spec's §4.8).
+        type: string
       selected_skills:
         description: Selected skill names (only used when SkillsSelectionMode is "selected")
         items:
@@ -1035,6 +1107,30 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
+  github_com_Tencent_WeKnora_internal_types.DockerSandboxConfig:
+    properties:
+      image:
+        type: string
+    type: object
+  github_com_Tencent_WeKnora_internal_types.E2BSandboxConfig:
+    properties:
+      api_key:
+        description: 加密
+        type: string
+      api_url:
+        type: string
+      e2b_sandbox_ttl_seconds:
+        type: integer
+      http_timeout_sec:
+        description: |-
+          HTTPTimeoutSec bounds each HTTP call to the sandbox control plane.
+          0 means use the built-in default (30s), never the deployment's value.
+        type: integer
+      sandbox_domain:
+        type: string
+      template_id:
+        type: string
+    type: object
   github_com_Tencent_WeKnora_internal_types.EmbeddingParameters:
     properties:
       dimension:
@@ -1043,6 +1139,68 @@ definitions:
         type: boolean
       truncate_prompt_tokens:
         type: integer
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 32
+        minLength: 8
+        type: string
+      user_id:
+        maxLength: 128
+        type: string
+      username:
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - email
+    - password
+    - user_id
+    - username
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResult'
+      success:
+        type: boolean
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResult:
+    properties:
+      api_key:
+        type: string
+      api_key_created:
+        type: boolean
+      api_key_id:
+        type: integer
+      capabilities:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      external_user_id:
+        type: string
+      full_access:
+        type: boolean
+      knowledge_base_ids:
+        items:
+          type: string
+        type: array
+      role:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.TenantRole'
+      space_id:
+        type: integer
+      user_created:
+        type: boolean
+      user_id:
+        type: string
+      username:
+        type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.ExtractConfig:
     properties:
@@ -2160,6 +2318,14 @@ definitions:
         items:
           $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.AgentStep'
         type: array
+      artifacts:
+        description: |-
+          Skill-generated files produced during this assistant turn (assistant messages only).
+          Populated by ArtifactCollector after the sandbox finishes, referenced by the
+          artifact download endpoint. Empty for user messages and turns without skills.
+        items:
+          $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.MessageArtifact'
+        type: array
       attachments:
         description: Attached files (documents, audio, etc., for user messages)
         items:
@@ -2227,6 +2393,30 @@ definitions:
         type: string
       updated_at:
         description: Last update timestamp
+        type: string
+    type: object
+  github_com_Tencent_WeKnora_internal_types.MessageArtifact:
+    properties:
+      created_at:
+        description: When WeKnora persisted the blob
+        type: string
+      file_name:
+        description: Original filename inside the sandbox
+        type: string
+      file_size:
+        description: File size in bytes
+        type: integer
+      file_type:
+        description: File extension (e.g., ".pptx", ".pdf")
+        type: string
+      mod_time:
+        description: Sandbox-side modification time (used for diff)
+        type: string
+      source_path:
+        description: Absolute path inside the sandbox (used for diff)
+        type: string
+      url:
+        description: Storage URL (provider://path); persisted, not sent to client
         type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.MessageAttachment:
@@ -3227,6 +3417,16 @@ definitions:
       pinned_at:
         description: PinnedAt records when the session was pinned; nil when not pinned.
         type: string
+      sandbox_config_id:
+        description: |-
+          SandboxConfigID pins which sandbox config this session's CURRENT live
+          sandbox was created on. Empty means no live sandbox;
+          SandboxConfigIDGlobalDefault means the deployment-wide default config.
+
+          This is an ephemeral pin that dies with the sandbox, not a permanent
+          owner: sessions outlive sandboxes by months, so treating it as
+          permanent would make "no session references this config" never true.
+        type: string
       tenant_id:
         description: Workspace ID
         type: integer
@@ -3634,6 +3834,45 @@ definitions:
     - TenantRoleAdmin
     - TenantRoleContributor
     - TenantRoleViewer
+  github_com_Tencent_WeKnora_internal_types.TenantSandboxConfig:
+    properties:
+      cube:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.CubeSandboxConfig'
+      default_timeout_sec:
+        description: |-
+          DefaultTimeoutSec is the per-execution timeout in seconds. 0 keeps the
+          deployment's WEKNORA_SANDBOX_TIMEOUT: an execution guardrail is operator
+          policy rather than part of this backend's identity, so it is the one
+          value a named config still takes from the environment.
+        type: integer
+      docker:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.DockerSandboxConfig'
+      e2b:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.E2BSandboxConfig'
+      env_vars:
+        additionalProperties:
+          type: string
+        description: "EnvVars are additional environment variables injected into every\nsandbox
+          created for this tenant. \U0001F512 Values are encrypted at rest.\nThese
+          become visible to all scripts running in the tenant's\nsandboxes — do not
+          place secrets here that scripts must not access."
+        type: object
+      sandbox_type:
+        description: |-
+          SandboxType selects the sandbox backend. Named configs must set it to
+          "cube" or "e2b"; "docker", "local" and "disabled" appear only on the
+          workspace policy row.
+        type: string
+      volume_mount:
+        allOf:
+        - $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.VolumeMountConfig'
+        description: |-
+          VolumeMount configures an optional shared volume mounted into every
+          sandbox created for this tenant. Currently used for tenant-installed
+          skills, but the configuration itself is skill-agnostic and can serve
+          any volume-mount use case (shared datasets, pre-installed toolchains,
+          etc.).
+    type: object
   github_com_Tencent_WeKnora_internal_types.ToolCall:
     properties:
       args:
@@ -3857,6 +4096,37 @@ definitions:
         description: |-
           兼容老版本
           Model Name
+        type: string
+    type: object
+  github_com_Tencent_WeKnora_internal_types.VolumeMountConfig:
+    properties:
+      enabled:
+        description: Enabled toggles the volume mount for this tenant.
+        type: boolean
+      mount_path:
+        description: |-
+          MountPath is the sandbox-internal path where the volume is mounted.
+          Default: /weknora/tenant/skills (customizable per use case).
+        type: string
+      provider:
+        description: Provider identifies the volume backend. Currently "e2b" or "cube".
+        type: string
+      volume_id:
+        description: |-
+          VolumeID is the provider-specific volume identifier, populated after
+          EnsureVolume / CreateVolume succeeds.
+        type: string
+      volume_name:
+        description: |-
+          VolumeName is the human-readable volume name, e.g.
+          "weknora-tenant-<id>-skills".
+        type: string
+      volume_owner_fingerprint:
+        description: |-
+          VolumeOwnerFingerprint = sha256(provider + APIKey + APIURL).
+          Used to detect when the tenant switched to a different backend or
+          API key, at which point the volume is no longer reachable and must
+          be recreated.
         type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.WeKnoraCloudCredentials:
@@ -5295,6 +5565,49 @@ definitions:
         description: Active / ClusterCapacity
         type: number
     type: object
+  internal_handler.SandboxCheckItem:
+    properties:
+      latency_ms:
+        type: integer
+      message:
+        type: string
+      name:
+        type: string
+      ok:
+        type: boolean
+    type: object
+  internal_handler.SandboxCheckRequest:
+    properties:
+      config:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.TenantSandboxConfig'
+      config_id:
+        description: |-
+          ConfigID lets an edit form test stored credentials while overriding only
+          the fields the admin changed in the drawer.
+        type: string
+      deep:
+        description: |-
+          Deep additionally creates and destroys one sandbox, which is the only
+          way to validate the template ID, Cube's proxy/envd data plane,
+          in-sandbox execution, and outbound egress (CN + international probes,
+          any one success). It consumes real sandbox time, so it is opt-in.
+        type: boolean
+    type: object
+  internal_handler.SandboxCheckResponse:
+    properties:
+      capabilities:
+        additionalProperties:
+          type: boolean
+        type: object
+      checks:
+        items:
+          $ref: '#/definitions/internal_handler.SandboxCheckItem'
+        type: array
+      ok:
+        type: boolean
+      provider:
+        type: string
+    type: object
   internal_handler.SearchMessagesRequest:
     properties:
       limit:
@@ -5632,6 +5945,17 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  internal_handler.sandboxConfigRequest:
+    properties:
+      config:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.TenantSandboxConfig'
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
     type: object
   internal_handler.storageBackendRequest:
     properties:
@@ -7055,6 +7379,35 @@ paths:
       summary: 删除生成的问题
       tags:
       - 分块管理
+  /conversation-sync:
+    post:
+      consumes:
+      - application/json
+      description: 按外部用户创建私有知识库，将 QA 内容追加到当天 Markdown 文档，并异步重建分片、向量、问题、Wiki 与知识图谱
+      parameters:
+      - description: 对话同步内容
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: 已持久化并提交后台处理
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: 同步用户每日对话
+      tags:
+      - 知识管理
   /datasource:
     get:
       description: List all data sources for a specific knowledge base
@@ -7519,6 +7872,48 @@ paths:
       summary: 执行评估
       tags:
       - 评估
+  /external-users:
+    post:
+      consumes:
+      - application/json
+      description: 在固定的 10001 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id
+        重试会返回同一用户和凭证
+      parameters:
+      - description: 外部用户资料
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 幂等重试成功
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse'
+        "201":
+          description: 用户或 API Key 已创建
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "403":
+          description: 必须使用 10001 空间的 Owner JWT 或 Full Access API Key
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "409":
+          description: 外部用户标识与已有账号冲突
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: 创建外部系统用户
+      tags:
+      - 空间管理
   /faq/import/progress/{task_id}:
     get:
       consumes:
@@ -12626,6 +13021,216 @@ paths:
       summary: 搜索可加入的空间
       tags:
       - 组织管理
+  /sandbox-configs:
+    get:
+      description: List workspace sandbox backend configs with credentials masked
+        and deployment defaults included.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sandbox configs and defaults
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: List sandbox configs
+      tags:
+      - SandboxConfig
+    post:
+      consumes:
+      - application/json
+      description: Create a named workspace sandbox backend config. Credentials are
+        masked in the response.
+      parameters:
+      - description: Sandbox backend config
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.sandboxConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created sandbox config
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or validation failure
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Create sandbox config
+      tags:
+      - SandboxConfig
+  /sandbox-configs/{id}:
+    delete:
+      description: Soft-delete a sandbox backend config. force=true only overrides
+        unverifiable provider inventory, never confirmed live sandboxes.
+      parameters:
+      - description: Sandbox config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Force delete when inventory is unverifiable
+        in: query
+        name: force
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Deletion success
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Live sandboxes or unverifiable inventory
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Delete sandbox config
+      tags:
+      - SandboxConfig
+    get:
+      description: Retrieve a workspace sandbox backend config with credentials masked.
+      parameters:
+      - description: Sandbox config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sandbox config
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Sandbox config not found
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Get sandbox config
+      tags:
+      - SandboxConfig
+    put:
+      consumes:
+      - application/json
+      description: Update a sandbox backend config. Identity-field changes are refused
+        while the config owns live or paused sandboxes.
+      parameters:
+      - description: Sandbox config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated sandbox config
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.sandboxConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated sandbox config
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Invalid request or validation failure
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Sandbox config not found
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "409":
+          description: Live sandboxes or unverifiable inventory
+          schema:
+            additionalProperties: true
+            type: object
+        "423":
+          description: Sandbox config is being modified by another request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Update sandbox config
+      tags:
+      - SandboxConfig
+  /sandbox-configs/{id}/sandboxes:
+    get:
+      description: Return live/paused sandbox inventory and affected agent names for
+        one config.
+      parameters:
+      - description: Sandbox config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Sandbox inventory
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Inspect sandbox config inventory
+      tags:
+      - SandboxConfig
   /sessions:
     get:
       consumes:
@@ -12851,6 +13456,38 @@ paths:
       summary: 取消置顶会话
       tags:
       - 会话
+  /sessions/{session_id}/artifacts:
+    get:
+      description: 返回本会话中所有 assistant 消息产生的技能产物元数据（不含 URL）
+      parameters:
+      - description: 会话ID
+        in: path
+        name: session_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      summary: 列出会话生成的产物文件
+      tags:
+      - 会话
+  /sessions/{session_id}/messages/{message_id}/artifacts:
+    get:
+      responses: {}
+  /sessions/{session_id}/messages/{message_id}/artifacts/{index}/download:
+    get:
+      responses: {}
   /sessions/{session_id}/messages/{message_id}/suggestions:
     get:
       parameters:
@@ -14075,6 +14712,28 @@ paths:
         "200":
           description: OK
       summary: 使用当前参数检测解析引擎可用性
+      tags:
+      - 系统
+  /system/sandbox-check:
+    post:
+      consumes:
+      - application/json
+      description: 使用当前填写的参数测试沙箱后端连通性，不保存配置；deep=true 会额外创建并销毁一个沙箱
+      parameters:
+      - description: 沙箱配置
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.SandboxCheckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SandboxCheckResponse'
+      summary: 测试沙箱连通性
       tags:
       - 系统
   /system/storage-engine-check:

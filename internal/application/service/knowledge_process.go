@@ -2460,6 +2460,27 @@ func (s *knowledgeService) ReparseKnowledge(
 			logger.Errorf(ctx, "Failed to get manual metadata for reparse: %v", metaErr)
 			return nil, werrors.NewBadRequestError("无法获取手工知识内容")
 		}
+		// Reparse is a fresh indexing revision even when the Markdown text did
+		// not change (the caller may have changed parse options). Bump the
+		// version while preserving unknown metadata keys such as process_overrides.
+		metadataMap, mapErr := existing.Metadata.Map()
+		if mapErr != nil {
+			return nil, mapErr
+		}
+		meta.Version++
+		meta.IndexedVersion = 0
+		meta.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		metadataMap["version"] = meta.Version
+		metadataMap["indexed_version"] = 0
+		metadataMap["updated_at"] = meta.UpdatedAt
+		metadataBytes, marshalErr := json.Marshal(metadataMap)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		existing.Metadata = types.JSON(metadataBytes)
+		if err := s.repo.UpdateKnowledgeColumn(ctx, existing.ID, "metadata", existing.Metadata); err != nil {
+			return nil, err
+		}
 
 		resetKnowledgeForReparse(existing, kb)
 
@@ -3076,9 +3097,24 @@ func (s *knowledgeService) ProcessManualUpdate(ctx context.Context, t *asynq.Tas
 		logger.Warnf(ctx, "ProcessManualUpdate: knowledge not found: %s", payload.KnowledgeID)
 		return nil
 	}
+	manualMeta, metaErr := knowledge.ManualMetadata()
+	if metaErr != nil || manualMeta == nil {
+		logger.Errorf(ctx, "ProcessManualUpdate: invalid manual metadata for %s: %v", payload.KnowledgeID, metaErr)
+		return nil
+	}
+	// A newer content revision already exists, or this exact revision already
+	// reached primary indexing. Old queued tasks must never clean up and replace
+	// the newer revision's chunks.
+	if payload.ContentVersion > 0 &&
+		(manualMeta.Version != payload.ContentVersion || manualMeta.IndexedVersion >= payload.ContentVersion) {
+		logger.Infof(ctx,
+			"ProcessManualUpdate: skipping stale/indexed revision knowledge=%s task_version=%d current=%d indexed=%d",
+			payload.KnowledgeID, payload.ContentVersion, manualMeta.Version, manualMeta.IndexedVersion)
+		return nil
+	}
 
 	// Skip if already completed or being deleted
-	if knowledge.ParseStatus == types.ParseStatusCompleted {
+	if payload.ContentVersion == 0 && knowledge.ParseStatus == types.ParseStatusCompleted {
 		logger.Infof(ctx, "ProcessManualUpdate: already completed, skipping: %s", payload.KnowledgeID)
 		return nil
 	}
@@ -3088,6 +3124,32 @@ func (s *knowledgeService) ProcessManualUpdate(ctx context.Context, t *asynq.Tas
 	}
 	if knowledge.ParseStatus == types.ParseStatusCancelled {
 		logger.Infof(ctx, "ProcessManualUpdate: cancelled by user, skipping: %s", payload.KnowledgeID)
+		return nil
+	}
+
+	releaseGuard, err := s.acquireManualProcessGuard(ctx, payload.TenantID, payload.KnowledgeID)
+	if err != nil {
+		return err
+	}
+	defer releaseGuard()
+
+	// The task may have waited behind another revision. Re-read under the guard
+	// so the stale check and destructive cleanup share one serialized snapshot.
+	knowledge, err = s.repo.GetKnowledgeByID(ctx, payload.TenantID, payload.KnowledgeID)
+	if err != nil || knowledge == nil {
+		logger.Errorf(ctx, "ProcessManualUpdate: failed to reload guarded knowledge: %v", err)
+		return nil
+	}
+	manualMeta, metaErr = knowledge.ManualMetadata()
+	if metaErr != nil || manualMeta == nil {
+		logger.Errorf(ctx, "ProcessManualUpdate: invalid guarded manual metadata: %v", metaErr)
+		return nil
+	}
+	if payload.ContentVersion > 0 &&
+		(manualMeta.Version != payload.ContentVersion || manualMeta.IndexedVersion >= payload.ContentVersion) {
+		logger.Infof(ctx,
+			"ProcessManualUpdate: guarded revision superseded knowledge=%s task_version=%d current=%d indexed=%d",
+			payload.KnowledgeID, payload.ContentVersion, manualMeta.Version, manualMeta.IndexedVersion)
 		return nil
 	}
 
@@ -3128,6 +3190,9 @@ func (s *knowledgeService) ProcessManualUpdate(ctx context.Context, t *asynq.Tas
 
 	// Cleanup old resources (indexes, chunks, graph) for update operations
 	if payload.NeedCleanup {
+		if kb.IsWikiEnabled() {
+			s.prepareWikiForReparse(ctx, knowledge)
+		}
 		if err := s.cleanupKnowledgeResources(ctx, knowledge); err != nil {
 			logger.ErrorWithFields(ctx, err, map[string]interface{}{
 				"knowledge_id": payload.KnowledgeID,
@@ -3142,7 +3207,49 @@ func (s *knowledgeService) ProcessManualUpdate(ctx context.Context, t *asynq.Tas
 
 	// Run manual processing (image resolution + chunking + embedding) synchronously within the worker
 	s.triggerManualProcessing(ctx, kb, knowledge, payload.Content, true)
+	if payload.ContentVersion > 0 {
+		s.markManualRevisionIndexed(ctx, payload.TenantID, payload.KnowledgeID, payload.ContentVersion)
+	}
 	return nil
+}
+
+// markManualRevisionIndexed records that the primary chunk/vector stage for a
+// content revision completed. It uses metadata CAS so it cannot overwrite a
+// conversation fragment appended while the worker was running.
+func (s *knowledgeService) markManualRevisionIndexed(
+	ctx context.Context, tenantID uint64, knowledgeID string, version int,
+) {
+	if version <= 0 {
+		return
+	}
+	for attempt := 0; attempt < 8; attempt++ {
+		knowledge, err := s.repo.GetKnowledgeByID(ctx, tenantID, knowledgeID)
+		if err != nil || knowledge == nil {
+			return
+		}
+		if knowledge.ProcessedAt == nil || knowledge.ParseStatus == types.ParseStatusFailed || knowledge.ErrorMessage != "" {
+			return
+		}
+		meta, err := knowledge.ManualMetadata()
+		if err != nil || meta == nil || meta.Version != version || meta.IndexedVersion >= version {
+			return
+		}
+		expected := append(types.JSON(nil), knowledge.Metadata...)
+		meta.IndexedVersion = version
+		replacement, err := meta.ToJSON()
+		if err != nil {
+			return
+		}
+		updated, err := s.repo.CompareAndSwapKnowledgeMetadata(
+			ctx, tenantID, knowledgeID, expected, replacement, nil)
+		if err != nil {
+			logger.Warnf(ctx, "ProcessManualUpdate: failed to mark revision indexed: %v", err)
+			return
+		}
+		if updated {
+			return
+		}
+	}
 }
 
 // ProcessDocument handles Asynq document processing tasks

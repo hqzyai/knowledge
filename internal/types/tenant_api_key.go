@@ -401,6 +401,22 @@ func AuthorizeTenantAPIKeyKnowledgeTargets(ctx context.Context, kbIDs, knowledge
 	return nil
 }
 
+// AuthorizeTenantAPIKeyTagScopes verifies that every tag-qualified search is
+// anchored to a KB in the key's allow-list. Without this check a caller could
+// omit knowledge_base_ids and reach an out-of-scope KB through a tag mention.
+func AuthorizeTenantAPIKeyTagScopes(ctx context.Context, tagScopes []TagScope) error {
+	scope, ok := TenantAPIKeyScopeFromContext(ctx)
+	if !ok || !scope.IsKnowledgeBaseRestricted() {
+		return nil
+	}
+	for _, tagScope := range tagScopes {
+		if !scope.AllowsKnowledgeBase(tagScope.KnowledgeBaseID) {
+			return errors.NewForbiddenError("API key scope does not allow one or more tag knowledge bases")
+		}
+	}
+	return nil
+}
+
 // AuthorizeTenantAPIKeyOptionalTagIDs rejects tag_ids for KB-restricted keys
 // because tag resolution can pull documents from arbitrary knowledge bases.
 func AuthorizeTenantAPIKeyOptionalTagIDs(ctx context.Context, tagIDs []string) error {

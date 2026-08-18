@@ -595,6 +595,45 @@ func (h *KnowledgeHandler) CreateManualKnowledge(c *gin.Context) {
 	})
 }
 
+// SyncConversation godoc
+// @Summary      同步用户每日对话
+// @Description  按外部用户创建私有知识库，将 QA 内容追加到当天 Markdown 文档，并异步重建分片、向量、问题、Wiki 与知识图谱
+// @Tags         知识管理
+// @Accept       json
+// @Produce      json
+// @Param        request  body      types.ConversationSyncRequest  true  "对话同步内容"
+// @Success      202      {object}  types.ConversationSyncResponse "已持久化并提交后台处理"
+// @Failure      400      {object}  errors.AppError                "请求参数错误"
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @Router       /conversation-sync [post]
+func (h *KnowledgeHandler) SyncConversation(c *gin.Context) {
+	ctx := c.Request.Context()
+	var req types.ConversationSyncRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
+		return
+	}
+
+	result, err := h.kgService.SyncConversation(ctx, &req)
+	if err != nil {
+		if appErr, ok := errors.IsAppError(err); ok {
+			c.Error(appErr)
+			return
+		}
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"external_user_id": secutils.SanitizeForLog(req.UserID),
+		})
+		c.Error(errors.NewInternalServerError(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusAccepted, types.ConversationSyncResponse{
+		Success: true,
+		Data:    *result,
+	})
+}
+
 // GetKnowledge godoc
 // @Summary      获取知识详情
 // @Description  根据ID获取知识条目详情

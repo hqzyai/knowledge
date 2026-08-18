@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS uq_tenant_api_keys_external_user_active;

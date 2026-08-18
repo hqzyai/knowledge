@@ -80,6 +80,12 @@ func (s *tenantAPIKeyService) CreateAPIKey(
 	if err := s.repo.CreateAPIKey(ctx, key); err != nil {
 		return nil, err
 	}
+	// GORM's BeforeSave hook encrypts tenant_api_keys.api_key through
+	// Statement.SetColumn. Some repository implementations therefore leave the
+	// in-memory model carrying the encrypted database value after CreateAPIKey
+	// returns. Keep the service result contract stable: callers that create a
+	// credential must receive the plaintext token generated above.
+	key.APIKey = token
 	return &interfaces.TenantAPIKeyCreateResult{APIKey: key, Token: token}, nil
 }
 

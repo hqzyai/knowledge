@@ -84,10 +84,10 @@ type TenantAPIKey struct {
 	APIKey           string           `json:"api_key"`
 	Role             TenantAPIKeyRole `json:"role"`
 	KnowledgeBaseIDs []string         `json:"knowledge_base_ids"`
-	LastUsedAt       *time.Time          `json:"last_used_at,omitempty"`
-	ExpiresAt        *time.Time          `json:"expires_at,omitempty"`
-	CreatedAt        time.Time           `json:"created_at"`
-	UpdatedAt        time.Time           `json:"updated_at"`
+	LastUsedAt       *time.Time       `json:"last_used_at,omitempty"`
+	ExpiresAt        *time.Time       `json:"expires_at,omitempty"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
 }
 
 // CreateTenantAPIKeyRequest creates a revocable tenant API key.
@@ -115,6 +115,33 @@ type tenantAPIKeyCreateResponse struct {
 	Data    CreatedTenantAPIKey `json:"data"`
 }
 
+// ExternalUserCreateRequest provisions a Hermes user in workspace 10001.
+// UserID must be the same stable external ID used by SyncConversation.
+type ExternalUserCreateRequest struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// ExternalUserCreateResult contains the provisioned account and its stable
+// conversation-only, knowledge-base-scoped machine credential.
+type ExternalUserCreateResult struct {
+	ExternalUserID   string   `json:"external_user_id"`
+	UserID           string   `json:"user_id"`
+	Username         string   `json:"username"`
+	Email            string   `json:"email"`
+	SpaceID          uint64   `json:"space_id"`
+	Role             string   `json:"role"`
+	APIKeyID         uint64   `json:"api_key_id"`
+	APIKey           string   `json:"api_key"`
+	FullAccess       bool     `json:"full_access"`
+	Capabilities     []string `json:"capabilities"`
+	KnowledgeBaseIDs []string `json:"knowledge_base_ids"`
+	UserCreated      bool     `json:"user_created"`
+	APIKeyCreated    bool     `json:"api_key_created"`
+}
+
 // CreateTenant creates a new tenant
 func (c *Client) CreateTenant(ctx context.Context, tenant *Tenant) (*Tenant, error) {
 	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v1/tenants", tenant, nil)
@@ -127,6 +154,25 @@ func (c *Client) CreateTenant(ctx context.Context, tenant *Tenant) (*Tenant, err
 		return nil, err
 	}
 
+	return &response.Data, nil
+}
+
+// CreateExternalUser creates or resumes an externally managed user in
+// workspace 10001 and returns the user's scoped conversation API key.
+func (c *Client) CreateExternalUser(
+	ctx context.Context, req *ExternalUserCreateRequest,
+) (*ExternalUserCreateResult, error) {
+	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v1/external-users", req, nil)
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Success bool                     `json:"success"`
+		Data    ExternalUserCreateResult `json:"data"`
+	}
+	if err := parseResponse(resp, &response); err != nil {
+		return nil, err
+	}
 	return &response.Data, nil
 }
 

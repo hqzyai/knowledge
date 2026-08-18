@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 
+	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/handler/dto"
@@ -711,6 +713,180 @@ func (h *TenantHandler) CreateAPIKey(c *gin.Context) {
 			Token:                result.Token,
 		},
 	})
+}
+
+// CreateExternalUser godoc
+// @Summary      创建外部系统用户
+// @Description  在固定的 10001 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证
+// @Tags         空间管理
+// @Accept       json
+// @Produce      json
+// @Param        request  body      types.ExternalUserCreateRequest  true  "外部用户资料"
+// @Success      200      {object}  types.ExternalUserCreateResponse "幂等重试成功"
+// @Success      201      {object}  types.ExternalUserCreateResponse "用户或 API Key 已创建"
+// @Failure      400      {object}  errors.AppError                  "请求参数错误"
+// @Failure      403      {object}  errors.AppError                  "必须使用 10001 空间的 Owner JWT 或 Full Access API Key"
+// @Failure      409      {object}  errors.AppError                  "外部用户标识与已有账号冲突"
+// @Security     Bearer
+// @Security     ApiKeyAuth
+// @Router       /external-users [post]
+func (h *TenantHandler) CreateExternalUser(c *gin.Context) {
+	ctx := c.Request.Context()
+	tenantID, ok := types.TenantIDFromContext(ctx)
+	if !ok || tenantID != types.ExternalUserDefaultTenantID {
+		c.Error(errors.NewForbiddenError("External users can only be provisioned from workspace 10001"))
+		return
+	}
+	if h.service == nil || h.userService == nil || h.memberService == nil || h.apiKeyService == nil {
+		c.Error(errors.NewServiceUnavailableError("External user provisioning is unavailable"))
+		return
+	}
+
+	var req types.ExternalUserCreateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(errors.NewValidationError("Invalid external user data").WithDetails(err.Error()))
+		return
+	}
+
+	user, userCreated, err := h.userService.ProvisionExternalUser(ctx, &req, tenantID)
+	if err != nil {
+		switch {
+		case stderrors.Is(err, service.ErrExternalUserIdentityConflict):
+			c.Error(errors.NewConflictError("user_id, username or email conflicts with an existing account"))
+		case stderrors.Is(err, service.ErrExternalUserTenantUnavailable):
+			c.Error(errors.NewServiceUnavailableError("Workspace 10001 is unavailable"))
+		case stderrors.Is(err, service.ErrPasswordPolicy):
+			c.Error(errors.NewValidationError("Password must be 8-32 characters and contain letters and numbers"))
+		default:
+			logger.ErrorWithFields(ctx, err, map[string]interface{}{
+				"external_user_id": secutils.SanitizeForLog(req.UserID),
+			})
+			c.Error(errors.NewBadRequestError(err.Error()))
+		}
+		return
+	}
+
+	key, keyCreated, err := h.ensureExternalUserConversationAPIKey(
+		ctx, tenantID, user.ID, strings.TrimSpace(req.UserID))
+	if err != nil {
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"external_user_id": secutils.SanitizeForLog(req.UserID),
+			"user_id":          user.ID,
+		})
+		c.Error(errors.NewInternalServerError("Failed to create external user API key").WithDetails(err.Error()))
+		return
+	}
+
+	status := http.StatusOK
+	if userCreated || keyCreated {
+		status = http.StatusCreated
+	}
+	c.JSON(status, types.ExternalUserCreateResponse{
+		Success: true,
+		Data: types.ExternalUserCreateResult{
+			ExternalUserID:   strings.TrimSpace(req.UserID),
+			UserID:           user.ID,
+			Username:         user.Username,
+			Email:            user.Email,
+			SpaceID:          tenantID,
+			Role:             types.TenantRoleContributor,
+			APIKeyID:         key.ID,
+			APIKey:           key.APIKey,
+			FullAccess:       key.FullAccess,
+			Capabilities:     key.Capabilities,
+			KnowledgeBaseIDs: key.KnowledgeBaseIDs,
+			UserCreated:      userCreated,
+			APIKeyCreated:    keyCreated,
+		},
+	})
+}
+
+// ensureExternalUserConversationAPIKey gives each externally provisioned user
+// a stable key limited to chat, retrieval, agent reads, and that user's
+// deterministic conversation KB IDs. API keys are stored encrypted by the
+// model hook when SYSTEM_AES_KEY is configured.
+func (h *TenantHandler) ensureExternalUserConversationAPIKey(
+	ctx context.Context, tenantID uint64, userID, externalUserID string,
+) (*types.TenantAPIKey, bool, error) {
+	name := types.ExternalUserAPIKeyNamePrefix + userID
+	capabilities := types.StringArray{
+		string(types.APIKeyCapabilityChat),
+		string(types.APIKeyCapabilityRetrieve),
+		string(types.APIKeyCapabilityReadAgents),
+	}
+	knowledgeBaseIDs := types.StringArray(
+		service.ConversationKnowledgeBaseCandidateIDs(tenantID, externalUserID))
+	keys, err := h.apiKeyService.ListAPIKeys(ctx, tenantID)
+	if err != nil {
+		return nil, false, err
+	}
+	var stale *types.TenantAPIKey
+	for _, key := range keys {
+		if key == nil || key.Name != name {
+			continue
+		}
+		if externalUserConversationKeyMatches(key, capabilities, knowledgeBaseIDs) {
+			return key, false, nil
+		}
+		stale = key
+	}
+	// Rotate credentials created by an earlier Full Access implementation to
+	// the least-privilege capability shape requested now.
+	if stale != nil {
+		_ = h.apiKeyService.RevokeAPIKey(ctx, tenantID, stale.ID)
+	}
+
+	result, err := h.apiKeyService.CreateAPIKey(ctx, interfaces.TenantAPIKeyCreateRequest{
+		TenantID:         tenantID,
+		ScopeType:        types.APIKeyScopeTenant,
+		Name:             name,
+		FullAccess:       false,
+		Capabilities:     capabilities,
+		KnowledgeBaseIDs: knowledgeBaseIDs,
+	})
+	if err != nil {
+		// The database has a partial unique index for active external-user
+		// credentials. If another process won the create race, resolve the
+		// winning row and preserve the idempotent response contract.
+		keys, listErr := h.apiKeyService.ListAPIKeys(ctx, tenantID)
+		if listErr == nil {
+			for _, key := range keys {
+				if key != nil && key.Name == name &&
+					externalUserConversationKeyMatches(key, capabilities, knowledgeBaseIDs) {
+					return key, false, nil
+				}
+			}
+		}
+		return nil, false, err
+	}
+	return result.APIKey, true, nil
+}
+
+func externalUserConversationKeyMatches(
+	key *types.TenantAPIKey, capabilities, knowledgeBaseIDs types.StringArray,
+) bool {
+	if key == nil || key.FullAccess || key.ExpiresAt != nil || key.APIKey == "" {
+		return false
+	}
+	scope := (types.TenantAPIKeyScope{
+		KnowledgeBaseIDs: key.KnowledgeBaseIDs,
+		Capabilities:     key.Capabilities,
+	}).Normalize()
+	if len(scope.KnowledgeBaseIDs) != len(knowledgeBaseIDs) ||
+		len(scope.Capabilities) != len(capabilities) {
+		return false
+	}
+	for _, capability := range capabilities {
+		if !scope.HasCapability(types.APIKeyCapability(capability)) {
+			return false
+		}
+	}
+	for _, kbID := range knowledgeBaseIDs {
+		if !scope.AllowsKnowledgeBase(kbID) {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *TenantHandler) DeleteAPIKey(c *gin.Context) {

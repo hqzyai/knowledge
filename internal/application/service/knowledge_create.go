@@ -1029,13 +1029,23 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 	}
 
 	var version int
+	var previousMeta *types.ManualKnowledgeMetadata
 	if meta, err := existing.ManualMetadata(); err == nil && meta != nil {
+		previousMeta = meta
 		version = meta.Version + 1
 	} else {
 		version = 1
 	}
 
 	meta := types.NewManualKnowledgeMetadata(cleanContent, status, version)
+	if previousMeta != nil {
+		// Conversation-managed documents remain appendable after an Admin edits
+		// them through the ordinary manual-document endpoint.
+		meta.SyncSource = previousMeta.SyncSource
+		meta.ExternalUserID = previousMeta.ExternalUserID
+		meta.DocumentDate = previousMeta.DocumentDate
+		meta.SyncEventIDs = append([]string(nil), previousMeta.SyncEventIDs...)
+	}
 	if err := existing.SetManualMetadata(meta); err != nil {
 		logger.Errorf(ctx, "Failed to set manual metadata during update: %v", err)
 		return nil, err
@@ -1063,6 +1073,10 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 			logger.Errorf(ctx, "Failed to persist manual draft: %v", err)
 			return nil, err
 		}
+		if err := s.repo.UpdateKnowledgeColumn(ctx, existing.ID, "metadata", existing.Metadata); err != nil {
+			logger.Errorf(ctx, "Failed to persist manual draft metadata: %v", err)
+			return nil, err
+		}
 		recordKBActivity(ctx, s.audit, tenantID, existing.KnowledgeBaseID, types.AuditActionKnowledgeUpdated,
 			"knowledge", existing.ID, types.AuditOutcomeSuccess, map[string]any{
 				"title": existing.Title, "status": status,
@@ -1081,6 +1095,10 @@ func (s *knowledgeService) UpdateManualKnowledge(ctx context.Context,
 
 	if err := s.repo.UpdateKnowledge(ctx, existing); err != nil {
 		logger.Errorf(ctx, "Failed to persist manual knowledge before indexing: %v", err)
+		return nil, err
+	}
+	if err := s.repo.UpdateKnowledgeColumn(ctx, existing.ID, "metadata", existing.Metadata); err != nil {
+		logger.Errorf(ctx, "Failed to persist manual knowledge metadata before indexing: %v", err)
 		return nil, err
 	}
 
@@ -1112,6 +1130,10 @@ func (s *knowledgeService) enqueueManualProcessing(ctx context.Context,
 	knowledge *types.Knowledge, content string, needCleanup bool,
 ) (string, error) {
 	requestID, _ := types.RequestIDFromContext(ctx)
+	contentVersion := 0
+	if meta, err := knowledge.ManualMetadata(); err == nil && meta != nil {
+		contentVersion = meta.Version
+	}
 	payload := types.ManualProcessPayload{
 		RequestId:       requestID,
 		TenantID:        knowledge.TenantID,
@@ -1119,6 +1141,7 @@ func (s *knowledgeService) enqueueManualProcessing(ctx context.Context,
 		KnowledgeBaseID: knowledge.KnowledgeBaseID,
 		Content:         content,
 		NeedCleanup:     needCleanup,
+		ContentVersion:  contentVersion,
 	}
 	langfuse.InjectTracing(ctx, &payload)
 	payloadBytes, err := json.Marshal(payload)
@@ -1127,7 +1150,7 @@ func (s *knowledgeService) enqueueManualProcessing(ctx context.Context,
 	}
 
 	task := asynq.NewTask(types.TypeManualProcess, payloadBytes,
-		asynq.Queue(types.QueueDefault), asynq.MaxRetry(3), asynq.Timeout(30*time.Minute))
+		asynq.Queue(types.QueueDefault), asynq.MaxRetry(120), asynq.Timeout(30*time.Minute))
 	info, err := s.task.Enqueue(task)
 	if err != nil {
 		return "", fmt.Errorf("failed to enqueue manual process task: %w", err)
