@@ -57,6 +57,13 @@ func RegisterTenantRoutes(
 		apiKeyPlatform(types.APIKeyCapabilitySystemTenantsRead, types.APIKeyCapabilitySystemTenantsManage),
 		g.CrossTenant(), handler.SearchTenants)
 
+	// Trusted system-to-system provisioning for Hermes. The handler pins the
+	// target to workspace 10001; JWT callers need Owner and machine callers need
+	// a tenant Full Access key because this endpoint provisions accounts and
+	// mints their least-privilege conversation credentials.
+	g.apiKeyRoute(r, http.MethodPost, "/external-users", apiKeyFullAccess(),
+		g.Owner(), handler.CreateExternalUser)
+
 	// 空间路由组
 	tenantRoutes := r.Group("/tenants")
 	{

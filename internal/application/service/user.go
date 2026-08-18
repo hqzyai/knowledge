@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"strings"
@@ -67,6 +68,15 @@ var (
 	// one so callers can reject no-op rotations that would still revoke
 	// every session.
 	ErrSamePassword = errors.New("new password must differ from current password")
+
+	// ErrExternalUserIdentityConflict means the stable external user ID is
+	// already bound to different account attributes, or the requested email /
+	// username belongs to another user.
+	ErrExternalUserIdentityConflict = errors.New("external user identity conflicts with an existing account")
+
+	// ErrExternalUserTenantUnavailable means the fixed provisioning workspace
+	// does not exist or is not active.
+	ErrExternalUserTenantUnavailable = errors.New("external user workspace is unavailable")
 )
 
 // Machine-readable change-password failure reasons for HTTP details fields.
@@ -221,6 +231,141 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 
 	logger.Info(ctx, "User registered successfully")
 	return user, nil
+}
+
+// ProvisionExternalUser creates or resumes one externally managed user in an
+// existing workspace. The deterministic users.id makes retries safe and also
+// lets conversation-sync assign KB ownership before the human account exists.
+func (s *userService) ProvisionExternalUser(
+	ctx context.Context,
+	req *types.ExternalUserCreateRequest,
+	tenantID uint64,
+) (*types.User, bool, error) {
+	if req == nil || tenantID == 0 || s.tenantService == nil || s.memberService == nil {
+		return nil, false, ErrExternalUserTenantUnavailable
+	}
+
+	externalUserID := strings.TrimSpace(req.UserID)
+	username := strings.TrimSpace(req.Username)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if externalUserID == "" || username == "" || email == "" || req.Password == "" {
+		return nil, false, errors.New("user_id, username, email and password are required")
+	}
+	if !utf8.ValidString(externalUserID) || utf8.RuneCountInString(externalUserID) > 128 {
+		return nil, false, errors.New("user_id is invalid or too long")
+	}
+	for _, r := range externalUserID {
+		if r < 0x20 || r == 0x7f {
+			return nil, false, errors.New("user_id contains control characters")
+		}
+	}
+	if safe, ok := secutils.ValidateInput(externalUserID); !ok || safe != externalUserID {
+		return nil, false, errors.New("user_id contains invalid characters")
+	}
+	if !utf8.ValidString(username) || utf8.RuneCountInString(username) < 2 || utf8.RuneCountInString(username) > 50 {
+		return nil, false, errors.New("username must be between 2 and 50 characters")
+	}
+	for _, r := range username {
+		if r < 0x20 || r == 0x7f {
+			return nil, false, errors.New("username contains control characters")
+		}
+	}
+	if safe, ok := secutils.ValidateInput(username); !ok || safe != username {
+		return nil, false, errors.New("username contains invalid characters")
+	}
+	parsedEmail, parseEmailErr := mail.ParseAddress(email)
+	if !utf8.ValidString(email) || utf8.RuneCountInString(email) > 255 ||
+		parseEmailErr != nil || parsedEmail.Address != email {
+		return nil, false, errors.New("email is invalid")
+	}
+	if safe, ok := secutils.ValidateInput(email); !ok || safe != email {
+		return nil, false, errors.New("email contains invalid characters")
+	}
+	if err := ValidatePasswordPolicy(req.Password); err != nil {
+		return nil, false, err
+	}
+
+	tenant, err := s.tenantService.GetTenantByID(ctx, tenantID)
+	if err != nil || tenant == nil || tenant.Status != "active" {
+		return nil, false, ErrExternalUserTenantUnavailable
+	}
+
+	internalUserID := types.ExternalUserInternalID(tenantID, externalUserID)
+	user, err := s.userRepo.GetUserByID(ctx, internalUserID)
+	created := false
+	if err != nil && !errors.Is(err, apprepo.ErrUserNotFound) {
+		return nil, false, err
+	}
+	if user == nil {
+		if existing, lookupErr := s.userRepo.GetUserByEmail(ctx, email); lookupErr == nil && existing != nil {
+			return nil, false, ErrExternalUserIdentityConflict
+		} else if lookupErr != nil && !errors.Is(lookupErr, apprepo.ErrUserNotFound) {
+			return nil, false, lookupErr
+		}
+		if existing, lookupErr := s.userRepo.GetUserByUsername(ctx, username); lookupErr == nil && existing != nil {
+			return nil, false, ErrExternalUserIdentityConflict
+		} else if lookupErr != nil && !errors.Is(lookupErr, apprepo.ErrUserNotFound) {
+			return nil, false, lookupErr
+		}
+
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if hashErr != nil {
+			return nil, false, errors.New("failed to process password")
+		}
+		now := time.Now()
+		user = &types.User{
+			ID:           internalUserID,
+			Username:     username,
+			Email:        email,
+			PasswordHash: string(hashedPassword),
+			TenantID:     tenantID,
+			IsActive:     true,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if createErr := s.userRepo.CreateUser(ctx, user); createErr != nil {
+			// A concurrent retry may have inserted the deterministic ID after
+			// our first read. Re-read and continue if it is the same identity.
+			winner, winnerErr := s.userRepo.GetUserByID(ctx, internalUserID)
+			if winnerErr != nil || winner == nil {
+				return nil, false, createErr
+			}
+			user = winner
+		} else {
+			created = true
+		}
+	}
+
+	if user.Username != username || !strings.EqualFold(user.Email, email) || user.TenantID != tenantID || !user.IsActive {
+		return nil, false, ErrExternalUserIdentityConflict
+	}
+
+	member, err := s.memberService.GetMembership(ctx, user.ID, tenantID)
+	if err != nil {
+		return nil, false, err
+	}
+	if member == nil {
+		if _, err = s.memberService.AddMember(ctx, user.ID, tenantID, types.TenantRoleContributor, nil); err != nil {
+			if !errors.Is(err, ErrMembershipAlreadyExists) {
+				return nil, false, err
+			}
+			member, err = s.memberService.GetMembership(ctx, user.ID, tenantID)
+			if err != nil || member == nil {
+				return nil, false, err
+			}
+		}
+	} else {
+		if member.Status != types.TenantMemberStatusActive {
+			return nil, false, ErrExternalUserIdentityConflict
+		}
+		if member.Role.Level() < types.TenantRoleContributor.Level() {
+			if err := s.memberService.UpdateRole(ctx, user.ID, tenantID, types.TenantRoleContributor); err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
+	return user, created, nil
 }
 
 // Login authenticates a user and returns tokens

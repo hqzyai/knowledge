@@ -11,6 +11,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestConversationSyncRouteAllowsAnyValidAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	g := &rbacGuards{}
+	v1 := gin.New().Group("/api/v1")
+
+	RegisterKnowledgeRoutes(v1, &handler.KnowledgeHandler{}, g)
+	policy := mustLookupAPIKeyPolicy(t, g, http.MethodPost, "/api/v1/conversation-sync")
+	if policy.RequireFullAccess || len(policy.Capabilities) != 0 || policy.PlatformOnly {
+		t.Fatalf("conversation sync policy = %#v, want any valid API key", policy)
+	}
+}
+
+func TestExternalUserRouteRequiresFullAccessAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	g := &rbacGuards{}
+	v1 := gin.New().Group("/api/v1")
+
+	RegisterTenantRoutes(v1, &handler.TenantHandler{}, nil, nil, nil, g)
+	policy := mustLookupAPIKeyPolicy(t, g, http.MethodPost, "/api/v1/external-users")
+	if !policy.RequireFullAccess {
+		t.Fatal("external user provisioning mints credentials and must require an existing Full Access key")
+	}
+}
+
 func TestConversationRoutesDeclareChatCapability(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	g := &rbacGuards{}

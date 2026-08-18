@@ -107,6 +107,8 @@ func NewAsyncqClient() (*asynq.Client, error) {
 // burning through retries; but short enough that users don't feel the stall.
 const wikiIngestRetryDelay = 15 * time.Second
 
+const manualProcessRetryDelay = 5 * time.Second
+
 // asynqRetryDelayFunc customizes per-task retry backoff.
 //
 // Default asynq backoff is exponential (≈10s, 40s, 90s, 2.5m, ...), which
@@ -120,6 +122,9 @@ const wikiIngestRetryDelay = 15 * time.Second
 func asynqRetryDelayFunc(n int, e error, t *asynq.Task) time.Duration {
 	if errors.Is(e, service.ErrWikiIngestConcurrent) {
 		return wikiIngestRetryDelay
+	}
+	if errors.Is(e, service.ErrManualProcessConcurrent) {
+		return manualProcessRetryDelay
 	}
 	return asynq.DefaultRetryDelayFunc(n, e, t)
 }

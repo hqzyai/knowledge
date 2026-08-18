@@ -815,6 +815,12 @@ func (s *sessionService) SearchKnowledge(ctx context.Context,
 	logger.Info(ctx, "Start knowledge base search without LLM summary")
 	logger.Infof(ctx, "Knowledge base search parameters, knowledge base IDs: %v, knowledge IDs: %v, tag scopes: %d, query: %s",
 		knowledgeBaseIDs, knowledgeIDs, len(tagScopes), query)
+	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, knowledgeBaseIDs, knowledgeIDs); err != nil {
+		return nil, err
+	}
+	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+		return nil, err
+	}
 
 	// Get tenant ID from context
 	tenantID, ok := types.TenantIDFromContext(ctx)

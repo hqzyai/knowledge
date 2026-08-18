@@ -65,6 +65,14 @@ func RegisterChunkRoutes(r *gin.RouterGroup, handler *handler.ChunkHandler, g *r
 // Cross-:id batch operations stay Contributor-gated — they don't have
 // a single owning KB to check against.
 func RegisterKnowledgeRoutes(r *gin.RouterGroup, handler *handler.KnowledgeHandler, g *rbacGuards) {
+	// System-to-system conversation ingestion performs its KB/document work
+	// internally. At the route boundary any valid API key is sufficient; no
+	// content capability or KB allow-list is required. JWT callers still need
+	// Admin+. No rate-limit middleware is attached; DB CAS + task queues handle
+	// concurrency.
+	g.apiKeyRoute(r, http.MethodPost, "/conversation-sync", apiKeyAny(),
+		g.Admin(), handler.SyncConversation)
+
 	// 知识库下的知识路由组（URL :id is the KB id）。Scoped API key 需要
 	// ingest 能力才能写内容，且仍受 KB 范围限制；清空 KB 只允许 full-access key。
 	kb := g.apiKeyGroup(r.Group("/knowledge-bases/:id/knowledge"), apiKeyIngest(apiKeyFullAccess()))

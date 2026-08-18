@@ -815,6 +815,28 @@ type UpdateManualKnowledgeRequest struct {
 	Content string `json:"content,omitempty"`
 }
 
+// ConversationSyncRequest appends one external user's QA fragment to that
+// user's Markdown conversation document for the fragment's local day.
+type ConversationSyncRequest struct {
+	UserID         string     `json:"user_id"`
+	QAContent      string     `json:"qa_content"`
+	ConversationAt *time.Time `json:"conversation_at,omitempty"`
+	EventID        string     `json:"event_id,omitempty"`
+}
+
+// ConversationSyncResult identifies the private KB and daily document touched
+// by SyncConversation. Processing continues asynchronously after the response.
+type ConversationSyncResult struct {
+	KnowledgeBaseID      string `json:"knowledge_base_id"`
+	KnowledgeID          string `json:"knowledge_id"`
+	DocumentDate         string `json:"document_date"`
+	ContentVersion       int    `json:"content_version"`
+	ParseStatus          string `json:"parse_status"`
+	KnowledgeBaseCreated bool   `json:"knowledge_base_created"`
+	DocumentCreated      bool   `json:"document_created"`
+	IdempotentReplay     bool   `json:"idempotent_replay"`
+}
+
 // BatchUpdateKnowledgeTagsRequest contains the mapping of knowledge IDs to tag IDs.
 type BatchUpdateKnowledgeTagsRequest struct {
 	Updates map[string]*string `json:"updates"` // knowledge_id -> tag_id (nil to clear)
@@ -849,6 +871,27 @@ func (c *Client) UpdateManualKnowledge(ctx context.Context, knowledgeID string, 
 		return nil, err
 	}
 
+	return &response.Data, nil
+}
+
+// SyncConversation persists an external user's QA fragment and schedules the
+// daily document for re-chunking, vectorization, questions, Wiki, and graph.
+// Any valid API key (or an Admin JWT session) may call this endpoint; API-key
+// capabilities and knowledge-base allow-lists are intentionally not evaluated.
+func (c *Client) SyncConversation(
+	ctx context.Context, request *ConversationSyncRequest,
+) (*ConversationSyncResult, error) {
+	resp, err := c.doRequest(ctx, http.MethodPost, "/api/v1/conversation-sync", request, nil)
+	if err != nil {
+		return nil, err
+	}
+	var response struct {
+		Success bool                   `json:"success"`
+		Data    ConversationSyncResult `json:"data"`
+	}
+	if err := parseResponse(resp, &response); err != nil {
+		return nil, err
+	}
 	return &response.Data, nil
 }
 

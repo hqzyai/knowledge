@@ -331,6 +331,9 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		return nil, nil, errors.NewBadRequestError(err.Error())
 	}
 	tagScopes := mergeTagScopesFromRequestIDs(mentionScopes, requestTagIDs, secutils.SanitizeForLogArray(kbIDs))
+	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+		return nil, nil, err
+	}
 	tagIDs := dedupRequestStrings(append(request.TagIDs, mentionedIDsByType(request.MentionedItems, "tag")...))
 	mcpServiceIDs := dedupRequestStrings(append(request.MCPServiceIDs, mentionedIDsByType(request.MentionedItems, "mcp")...))
 	skillNames := dedupRequestStrings(append(request.SkillNames, mentionedIDsByType(request.MentionedItems, "skill")...))
@@ -759,6 +762,10 @@ func (h *Handler) SearchKnowledge(c *gin.Context) {
 		return
 	}
 	tagScopes := mergeTagScopesFromRequestIDs(mentionScopes, requestTagIDs, secutils.SanitizeForLogArray(knowledgeBaseIDs))
+	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+		c.Error(err)
+		return
+	}
 
 	if len(knowledgeBaseIDs) == 0 && len(request.KnowledgeIDs) == 0 && len(tagScopes) == 0 {
 		logger.Error(ctx, "No knowledge base IDs, knowledge IDs, or tag scopes provided")

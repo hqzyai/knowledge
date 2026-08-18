@@ -38,6 +38,39 @@ func TestTenantAPIKeyServiceCreateAPIKeyUsesSKPrefix(t *testing.T) {
 	}
 }
 
+type mutatingTenantAPIKeyRepo struct {
+	*fakeTenantAPIKeyRepo
+}
+
+func (r *mutatingTenantAPIKeyRepo) CreateAPIKey(ctx context.Context, key *types.TenantAPIKey) error {
+	if err := r.fakeTenantAPIKeyRepo.CreateAPIKey(ctx, key); err != nil {
+		return err
+	}
+	// Match the observable effect of the production GORM BeforeSave hook:
+	// Statement.SetColumn may leave the caller's model holding ciphertext.
+	key.APIKey = "encrypted-database-value"
+	return nil
+}
+
+func TestTenantAPIKeyServiceCreateAPIKeyRestoresPlaintextAfterRepositoryMutation(t *testing.T) {
+	repo := &mutatingTenantAPIKeyRepo{fakeTenantAPIKeyRepo: newFakeTenantAPIKeyRepo()}
+	svc := NewTenantAPIKeyService(repo)
+
+	result, err := svc.CreateAPIKey(context.Background(), interfaces.TenantAPIKeyCreateRequest{
+		TenantID: 42,
+		Name:     "external-user/test",
+	})
+	if err != nil {
+		t.Fatalf("CreateAPIKey returned error: %v", err)
+	}
+	if result.APIKey.APIKey != result.Token {
+		t.Fatalf("created api_key did not preserve the plaintext token")
+	}
+	if result.APIKey.APIKey == "encrypted-database-value" {
+		t.Fatal("created api_key leaked the repository's encrypted storage value")
+	}
+}
+
 func newFakeTenantAPIKeyRepo() *fakeTenantAPIKeyRepo {
 	return &fakeTenantAPIKeyRepo{byHash: map[string]*types.TenantAPIKey{}, nextID: 1}
 }

@@ -492,6 +492,9 @@ type ManualProcessPayload struct {
 	KnowledgeBaseID string `json:"knowledge_base_id"`
 	Content         string `json:"content"`      // cleaned markdown content
 	NeedCleanup     bool   `json:"need_cleanup"` // true for update, false for create
+	// ContentVersion makes rapid manual/conversation updates revision-safe.
+	// Zero denotes a legacy task created before version-aware processing.
+	ContentVersion int `json:"content_version,omitempty"`
 }
 
 // ImageMultimodalPayload represents the image multimodal processing task payload.

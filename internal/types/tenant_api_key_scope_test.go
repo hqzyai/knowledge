@@ -35,6 +35,19 @@ func TestAuthorizeTenantAPIKeyOptionalTagIDsRejectsTags(t *testing.T) {
 	}
 }
 
+func TestAuthorizeTenantAPIKeyTagScopesRejectsOutOfScopeKB(t *testing.T) {
+	ctx := WithTenantAPIKeyScope(context.Background(), TenantAPIKeyScope{
+		KnowledgeBaseIDs: StringArray{"kb-1"},
+	})
+	err := AuthorizeTenantAPIKeyTagScopes(ctx, []TagScope{{
+		KnowledgeBaseID: "kb-2",
+		TagIDs:          []string{"tag-1"},
+	}})
+	if err == nil {
+		t.Fatal("expected forbidden for tag scope outside the API key KB allow-list")
+	}
+}
+
 func TestFilterKnowledgeBasesForTenantAPIKeyScopeIntersectsAgentDefaults(t *testing.T) {
 	ctx := WithTenantAPIKeyScope(context.Background(), TenantAPIKeyScope{
 		KnowledgeBaseIDs: StringArray{"kb-1", "kb-2"},

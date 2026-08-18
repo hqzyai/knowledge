@@ -11,6 +11,9 @@ import (
 
 // KnowledgeService defines the interface for knowledge services.
 type KnowledgeService interface {
+	// SyncConversation appends an external user's QA content to one private,
+	// per-user knowledge base and one manual Markdown document per local day.
+	SyncConversation(ctx context.Context, request *types.ConversationSyncRequest) (*types.ConversationSyncResult, error)
 	// CreateKnowledgeFromFile creates knowledge from a file.
 	// channel identifies the ingestion channel (e.g. "web", "api", "wechat"); empty defaults to "web".
 	CreateKnowledgeFromFile(
@@ -289,6 +292,17 @@ type KnowledgeRepository interface {
 	// statement so callers that flip several related fields (e.g. parse_status +
 	// error_message) cannot leave the row in a half-updated state.
 	UpdateKnowledgeColumns(ctx context.Context, id string, values map[string]interface{}) error
+	// CompareAndSwapKnowledgeMetadata replaces metadata and the supplied related
+	// columns only when the currently persisted metadata still equals expected.
+	// It is the optimistic-concurrency primitive used by conversation sync.
+	CompareAndSwapKnowledgeMetadata(
+		ctx context.Context,
+		tenantID uint64,
+		id string,
+		expected types.JSON,
+		replacement types.JSON,
+		values map[string]interface{},
+	) (bool, error)
 	// UpdateActiveDeletingKnowledgeColumns updates an active, non-deleted knowledge row
 	// only when it is still in the transient deleting state.
 	UpdateActiveDeletingKnowledgeColumns(ctx context.Context, id string, values map[string]interface{}) (bool, error)
