@@ -1869,7 +1869,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "按外部用户创建私有知识库，将 QA 内容追加到当天 Markdown 文档，并异步重建分片、向量、问题、Wiki 与知识图谱",
+                "description": "按外部用户创建私有知识库，用最新对话快照覆盖当天 Markdown 文档，并异步重建分片、向量、问题与 Wiki",
                 "consumes": [
                     "application/json"
                 ],
@@ -16251,6 +16251,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "text",
+                "title",
                 "user_id"
             ],
             "properties": {
@@ -16261,6 +16262,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "text": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 },
                 "user_id": {

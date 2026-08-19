@@ -815,10 +815,11 @@ type UpdateManualKnowledgeRequest struct {
 	Content string `json:"content,omitempty"`
 }
 
-// ConversationSyncRequest appends one external user's QA fragment to that
-// user's Markdown conversation document for the fragment's local day.
+// ConversationSyncRequest replaces an external user's Markdown conversation
+// snapshot for the request's local day.
 type ConversationSyncRequest struct {
 	UserID         string     `json:"user_id"`
+	Title          string     `json:"title"`
 	Text           string     `json:"text"`
 	ConversationAt *time.Time `json:"conversation_at,omitempty"`
 	EventID        string     `json:"event_id,omitempty"`
@@ -874,8 +875,8 @@ func (c *Client) UpdateManualKnowledge(ctx context.Context, knowledgeID string, 
 	return &response.Data, nil
 }
 
-// SyncConversation persists an external user's QA fragment and schedules the
-// daily document for re-chunking, vectorization, questions, Wiki, and graph.
+// SyncConversation persists an external user's daily conversation snapshot and
+// schedules the document for re-chunking, vectorization, questions, and Wiki.
 // Any valid API key (or an Admin JWT session) may call this endpoint; API-key
 // capabilities and knowledge-base allow-lists are intentionally not evaluated.
 func (c *Client) SyncConversation(

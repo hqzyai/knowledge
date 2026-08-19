@@ -27,15 +27,15 @@ const (
 
 // SyncConversation is the Hermes-facing ingestion primitive. Resources have
 // deterministic IDs, which gives first-call creation an idempotent uniqueness
-// boundary without a separate mapping table. Daily content itself is appended
-// with metadata CAS, so simultaneous deliveries cannot lose one another.
+// boundary without a separate mapping table. Daily content is replaced with
+// metadata CAS, so concurrent deliveries publish one complete snapshot.
 func (s *knowledgeService) SyncConversation(
 	ctx context.Context, request *types.ConversationSyncRequest,
 ) (*types.ConversationSyncResult, error) {
 	if request == nil {
 		return nil, werrors.NewBadRequestError("请求内容不能为空")
 	}
-	userID, qaContent, eventID, err := validateConversationSyncRequest(request)
+	userID, title, qaContent, eventID, err := validateConversationSyncRequest(request)
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +56,8 @@ func (s *knowledgeService) SyncConversation(
 		return nil, err
 	}
 
-	knowledge, documentCreated, replay, err := s.appendDailyConversation(
-		ctx, tenantID, kb, userID, documentDate, conversationAt, qaContent, eventID)
+	knowledge, documentCreated, replay, err := s.upsertDailyConversation(
+		ctx, tenantID, kb, userID, title, documentDate, qaContent, eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -109,47 +109,62 @@ func (s *knowledgeService) SyncConversation(
 
 func validateConversationSyncRequest(
 	request *types.ConversationSyncRequest,
-) (userID string, qaContent string, eventID string, err error) {
+) (userID string, title string, qaContent string, eventID string, err error) {
 	userID = strings.TrimSpace(request.UserID)
 	if userID == "" {
-		return "", "", "", werrors.NewValidationError("user_id 不能为空")
+		return "", "", "", "", werrors.NewValidationError("user_id 不能为空")
 	}
 	if !utf8.ValidString(userID) || len([]rune(userID)) > conversationSyncMaxUserIDLen {
-		return "", "", "", werrors.NewValidationError("user_id 非法或过长")
+		return "", "", "", "", werrors.NewValidationError("user_id 非法或过长")
 	}
 	if _, ok := secutils.ValidateInput(userID); !ok {
-		return "", "", "", werrors.NewValidationError("user_id 包含非法字符")
+		return "", "", "", "", werrors.NewValidationError("user_id 包含非法字符")
 	}
 	for _, r := range userID {
 		if r < 0x20 || r == 0x7f {
-			return "", "", "", werrors.NewValidationError("user_id 包含控制字符")
+			return "", "", "", "", werrors.NewValidationError("user_id 包含控制字符")
+		}
+	}
+
+	title = strings.TrimSpace(request.Title)
+	if title == "" {
+		return "", "", "", "", werrors.NewValidationError("title 不能为空")
+	}
+	if safe, ok := secutils.ValidateInput(title); !ok {
+		return "", "", "", "", werrors.NewValidationError("title 包含非法字符")
+	} else {
+		title = safe
+	}
+	for _, r := range title {
+		if r < 0x20 || r == 0x7f {
+			return "", "", "", "", werrors.NewValidationError("title 包含控制字符")
 		}
 	}
 
 	qaContent = strings.TrimSpace(secutils.CleanMarkdown(request.Text))
 	if qaContent == "" {
-		return "", "", "", werrors.NewValidationError("text 不能为空")
+		return "", "", "", "", werrors.NewValidationError("text 不能为空")
 	}
 	if safe, ok := secutils.ValidateInput(qaContent); !ok {
-		return "", "", "", werrors.NewValidationError("text 包含非法字符")
+		return "", "", "", "", werrors.NewValidationError("text 包含非法字符")
 	} else {
 		qaContent = safe
 	}
 	if len([]rune(qaContent)) > manualContentMaxLength {
-		return "", "", "", werrors.NewValidationError(
+		return "", "", "", "", werrors.NewValidationError(
 			fmt.Sprintf("text 超出长度限制（最多%d个字符）", manualContentMaxLength))
 	}
 
 	eventID = strings.TrimSpace(request.EventID)
 	if !utf8.ValidString(eventID) || len([]rune(eventID)) > conversationSyncMaxEventIDLen {
-		return "", "", "", werrors.NewValidationError("event_id 过长")
+		return "", "", "", "", werrors.NewValidationError("event_id 过长")
 	}
 	for _, r := range eventID {
 		if r < 0x20 || r == 0x7f {
-			return "", "", "", werrors.NewValidationError("event_id 包含控制字符")
+			return "", "", "", "", werrors.NewValidationError("event_id 包含控制字符")
 		}
 	}
-	return userID, qaContent, eventID, nil
+	return userID, title, qaContent, eventID, nil
 }
 
 func (s *knowledgeService) ensureConversationKnowledgeBase(
@@ -187,22 +202,25 @@ func (s *knowledgeService) ensureConversationKnowledgeBase(
 			EmbeddingModelID: embeddingModelID,
 			SummaryModelID:   summaryModelID,
 			ChunkingConfig: types.ChunkingConfig{
-				ChunkSize:    512,
-				ChunkOverlap: 80,
-				Separators:   []string{"\n\n", "\n", "。", "！", "？", ";", "；"},
-				Strategy:     "auto",
+				ChunkSize:         512,
+				ChunkOverlap:      80,
+				Separators:        []string{"\n\n", "\n", "。", "！", "？", ";", "；"},
+				EnableParentChild: true,
+				ParentChunkSize:   4096,
+				ChildChunkSize:    384,
+				Strategy:          "auto",
 			},
 			QuestionGenerationConfig: &types.QuestionGenerationConfig{
 				Enabled:       true,
 				QuestionCount: 3,
 			},
 			WikiConfig:    &types.WikiConfig{SynthesisModelID: summaryModelID},
-			ExtractConfig: &types.ExtractConfig{Enabled: true},
+			ExtractConfig: &types.ExtractConfig{Enabled: false},
 			IndexingStrategy: types.IndexingStrategy{
 				VectorEnabled:  true,
 				KeywordEnabled: true,
 				WikiEnabled:    true,
-				GraphEnabled:   true,
+				GraphEnabled:   false,
 			},
 		}
 		// Conversation ingestion is authenticated only at the endpoint layer.
@@ -261,25 +279,24 @@ func (s *knowledgeService) selectConversationModels(
 	return embeddingModelID, summaryModelID, nil
 }
 
-func (s *knowledgeService) appendDailyConversation(
+func (s *knowledgeService) upsertDailyConversation(
 	ctx context.Context,
 	tenantID uint64,
 	kb *types.KnowledgeBase,
 	userID string,
+	title string,
 	documentDate string,
-	conversationAt time.Time,
 	qaContent string,
 	eventID string,
 ) (*types.Knowledge, bool, bool, error) {
 	eventHash := conversationSyncEventHash(tenantID, userID, eventID)
-	block := formatConversationMarkdownBlock(conversationAt, qaContent)
+	content := formatConversationMarkdownDocument(title, qaContent)
 
 	for slot := 0; slot < conversationSyncResourceSlots; slot++ {
 		id := conversationSyncDeterministicID("document", tenantID, userID, documentDate, slot)
 		for casAttempt := 0; casAttempt < conversationSyncCASMaxAttempts; casAttempt++ {
 			knowledge, err := s.repo.GetKnowledgeByID(ctx, tenantID, id)
 			if errors.Is(err, repository.ErrKnowledgeNotFound) {
-				content := fmt.Sprintf("# %s 用户对话\n\n%s", documentDate, block)
 				meta := types.NewManualKnowledgeMetadata(content, types.ManualKnowledgeStatusPublish, 1)
 				meta.SyncSource = types.ConversationSyncSourceHermes
 				meta.ExternalUserID = userID
@@ -292,14 +309,14 @@ func (s *knowledgeService) appendDailyConversation(
 					TenantID:         tenantID,
 					KnowledgeBaseID:  kb.ID,
 					Type:             types.KnowledgeTypeManual,
-					Title:            documentDate + " 用户对话",
+					Title:            title,
 					Source:           types.KnowledgeTypeManual,
 					Channel:          types.ChannelAPI,
 					ParseStatus:      types.ParseStatusPending,
 					SummaryStatus:    types.SummaryStatusNone,
 					EnableStatus:     "disabled",
 					EmbeddingModelID: kb.EmbeddingModelID,
-					FileName:         documentDate + "-conversation.md",
+					FileName:         ensureManualFileName(title),
 					FileType:         types.KnowledgeTypeManual,
 					CreatedAt:        time.Now(),
 					UpdatedAt:        time.Now(),
@@ -334,7 +351,6 @@ func (s *knowledgeService) appendDailyConversation(
 				return knowledge, false, true, nil
 			}
 
-			content := strings.TrimSpace(meta.Content) + "\n\n" + block
 			if len([]rune(content)) > manualContentMaxLength {
 				return nil, false, false, werrors.NewValidationError(
 					fmt.Sprintf("%s 的当日对话文档已达到%d字符上限", documentDate, manualContentMaxLength))
@@ -356,6 +372,8 @@ func (s *knowledgeService) appendDailyConversation(
 			}
 			updated, err := s.repo.CompareAndSwapKnowledgeMetadata(
 				ctx, tenantID, knowledge.ID, expected, replacement, map[string]interface{}{
+					"title":                  title,
+					"file_name":              ensureManualFileName(title),
 					"parse_status":           types.ParseStatusPending,
 					"summary_status":         types.SummaryStatusNone,
 					"enable_status":          "disabled",
@@ -372,6 +390,8 @@ func (s *knowledgeService) appendDailyConversation(
 				continue
 			}
 			knowledge.Metadata = replacement
+			knowledge.Title = title
+			knowledge.FileName = ensureManualFileName(title)
 			knowledge.ParseStatus = types.ParseStatusPending
 			knowledge.SummaryStatus = types.SummaryStatusNone
 			knowledge.ProcessedAt = nil
@@ -416,8 +436,8 @@ func conversationKnowledgeBaseName(userID string) string {
 	return name
 }
 
-func formatConversationMarkdownBlock(at time.Time, qaContent string) string {
-	return fmt.Sprintf("## %s\n\n%s", at.Format("15:04:05"), strings.TrimSpace(qaContent))
+func formatConversationMarkdownDocument(title, qaContent string) string {
+	return fmt.Sprintf("# %s\n\n%s", title, strings.TrimSpace(qaContent))
 }
 
 func conversationSyncEventHash(tenantID uint64, userID, eventID string) string {

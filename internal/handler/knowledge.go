@@ -597,7 +597,7 @@ func (h *KnowledgeHandler) CreateManualKnowledge(c *gin.Context) {
 
 // SyncConversation godoc
 // @Summary      同步用户每日对话
-// @Description  按外部用户创建私有知识库，将 QA 内容追加到当天 Markdown 文档，并异步重建分片、向量、问题、Wiki 与知识图谱
+// @Description  按外部用户创建私有知识库，用最新对话快照覆盖当天 Markdown 文档，并异步重建分片、向量、问题与 Wiki
 // @Tags         知识管理
 // @Accept       json
 // @Produce      json
