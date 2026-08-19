@@ -158,9 +158,11 @@ func (s *stubAgentShareForGuard) CountByOrganizations(context.Context, []string)
 // guardOpts collects optional knobs for runGuard. Keeps the call site
 // readable when most tests only care about a couple of dimensions.
 type guardOpts struct {
-	agentID             string // ?agent_id query param
-	agentSourceTenantID string // ?agent_source_tenant_id query param
+	agentID             string                  // ?agent_id query param
+	agentSourceTenantID string                  // ?agent_source_tenant_id query param
 	agentShare          *stubAgentShareForGuard // nil means "no agent-share service"
+	userID              string
+	tenantRole          types.TenantRole
 }
 
 // runGuard fires a single request through the guard and returns the
@@ -195,6 +197,12 @@ func runGuard(
 	}
 	req := httptest.NewRequest("GET", url, nil)
 	ctx := context.WithValue(req.Context(), types.TenantIDContextKey, tenantID)
+	if opts.userID != "" {
+		ctx = context.WithValue(ctx, types.UserIDContextKey, opts.userID)
+	}
+	if opts.tenantRole != "" {
+		ctx = context.WithValue(ctx, types.TenantRoleContextKey, opts.tenantRole)
+	}
 	c.Request = req.WithContext(ctx)
 
 	kbsvc := &stubKBLookup{kbs: map[string]*types.KnowledgeBase{}}
@@ -225,6 +233,42 @@ func runGuard(
 	)
 	guard(c)
 	return rec, c
+}
+
+func TestRequireKBAccess_PersonalVisibility(t *testing.T) {
+	kb := &types.KnowledgeBase{
+		ID: "kb-private", TenantID: 100, CreatorID: "creator",
+		Visibility: types.KnowledgeBaseVisibilityPersonal,
+	}
+
+	_, denied := runGuard(t, 100, kb.ID, types.OrgRoleViewer, kb, nil, guardOpts{
+		userID: "other", tenantRole: types.TenantRoleContributor,
+	})
+	require.True(t, denied.IsAborted(), "ordinary workspace member must not read another creator's personal KB")
+
+	_, creator := runGuard(t, 100, kb.ID, types.OrgRoleViewer, kb, nil, guardOpts{
+		userID: "creator", tenantRole: types.TenantRoleContributor,
+	})
+	require.False(t, creator.IsAborted(), "creator may read their personal KB")
+
+	_, admin := runGuard(t, 100, kb.ID, types.OrgRoleViewer, kb, nil, guardOpts{
+		userID: "admin", tenantRole: types.TenantRoleAdmin,
+	})
+	require.False(t, admin.IsAborted(), "workspace admin may read every personal KB")
+}
+
+func TestRequireKBAccess_WorkspaceVisibilityGrantsReadOnly(t *testing.T) {
+	kb := &types.KnowledgeBase{
+		ID: "kb-open", TenantID: 100, CreatorID: "creator",
+		Visibility: types.KnowledgeBaseVisibilityWorkspace,
+	}
+	_, c := runGuard(t, 100, kb.ID, types.OrgRoleViewer, kb, nil, guardOpts{
+		userID: "other", tenantRole: types.TenantRoleViewer,
+	})
+	require.False(t, c.IsAborted())
+	access, ok := KBAccessFromContext(c)
+	require.True(t, ok)
+	require.Equal(t, types.OrgRoleViewer, access.Permission)
 }
 
 func TestRequireKBAccess_OwnKB(t *testing.T) {

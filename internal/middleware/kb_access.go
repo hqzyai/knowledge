@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	stderrors "errors"
+	"strings"
 
 	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/config"
@@ -343,8 +344,41 @@ func resolveKBAccessOnce(
 		return nil, errKBAccessNotFound
 	}
 
-	// 1. Own KB.
+	// 1. KB in the caller's own workspace. Workspace membership alone is not
+	//    sufficient for reads: personal KBs are visible only to their creator
+	//    and workspace Admin/Owner callers. This local visibility dimension is
+	//    deliberately evaluated before (and independently from) cross-workspace
+	//    organization/agent sharing below.
 	if kb.TenantID == tenantID {
+		if requiredPermission == types.OrgRoleViewer {
+			if !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+				logger.Warnf(ctx, "[kb_access] workspace member denied personal KB %s", kbID)
+				return nil, errKBAccessForbidden
+			}
+			permission := types.OrgRoleViewer
+			userID, _ := types.UserIDFromContext(ctx)
+			_, isAPIKey := types.TenantAPIKeyScopeFromContext(ctx)
+			if isAPIKey || callerTenantRole.HasPermission(types.TenantRoleAdmin) ||
+				(userID != "" && kb.CreatorID == userID) || strings.TrimSpace(string(kb.Visibility)) == "" {
+				permission = types.OrgRoleAdmin
+			}
+			return &KBAccess{
+				KnowledgeBase:     kb,
+				EffectiveTenantID: tenantID,
+				Permission:        permission,
+			}, nil
+		}
+
+		// Write/admin routes must never inherit permission merely from the
+		// workspace visibility switch. Route-level ownership guards remain in
+		// place, and this check makes the shared authorization primitive safe on
+		// its own as well.
+		userID, _ := types.UserIDFromContext(ctx)
+		_, isAPIKey := types.TenantAPIKeyScopeFromContext(ctx)
+		if !isAPIKey && !callerTenantRole.HasPermission(types.TenantRoleAdmin) &&
+			(userID == "" || kb.CreatorID != userID) {
+			return nil, errKBAccessForbidden
+		}
 		return &KBAccess{
 			KnowledgeBase:     kb,
 			EffectiveTenantID: tenantID,

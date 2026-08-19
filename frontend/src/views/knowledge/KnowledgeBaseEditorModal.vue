@@ -175,6 +175,28 @@
                         />
                       </div>
 
+                      <div v-if="canManageWorkspaceVisibility" class="form-item">
+                        <div class="setting-row">
+                          <div class="setting-info">
+                            <label class="form-label">{{ $t('knowledgeEditor.basic.workspaceVisibilityLabel') }}</label>
+                            <p class="form-tip">{{ $t('knowledgeEditor.basic.workspaceVisibilityDescription') }}</p>
+                          </div>
+                          <div class="setting-control">
+                            <t-switch
+                              :value="kbVisibility === 'workspace'"
+                              :loading="visibilitySaving"
+                              :disabled="visibilitySaving"
+                              @change="handleWorkspaceVisibilityChange"
+                            />
+                          </div>
+                        </div>
+                        <p class="form-tip">
+                          {{ kbVisibility === 'workspace'
+                            ? $t('knowledgeEditor.basic.workspaceVisibilityOpen')
+                            : $t('knowledgeEditor.basic.workspaceVisibilityPersonal') }}
+                        </p>
+                      </div>
+
                       <!-- Wiki 合成模型移至模型配置页 -->
                     </div>
                   </div>
@@ -466,7 +488,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import KbCreateContextualGuide from '@/components/KbCreateContextualGuide.vue'
 import { KB_EDITOR_FOCUS_SECTION_EVENT, markContextualGuideDone } from '@/config/contextualGuides'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
-import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase, rebuildKBIndex } from '@/api/knowledge-base'
+import { createKnowledgeBase, getKnowledgeBaseById, listKnowledgeFiles, updateKnowledgeBase, updateKnowledgeBaseVisibility, rebuildKBIndex, type KnowledgeBaseVisibility } from '@/api/knowledge-base'
 import { updateKBConfig, type KBModelConfigRequest } from '@/api/initialization'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { selectInitialModelId } from '@/utils/modelDefaults'
@@ -571,6 +593,33 @@ const dsCount = ref(0)
 // only tenant Admin+ can mutate their share settings.
 const kbCreatorId = ref<string>('')
 const kbTenantId = ref<number>(0)
+const kbVisibility = ref<KnowledgeBaseVisibility>('personal')
+const visibilitySaving = ref(false)
+
+const canManageWorkspaceVisibility = computed(() => {
+  if (editorMode.value !== 'edit' || !activeKbId.value) return false
+  if (Number(kbTenantId.value || 0) !== Number(authStore.currentTenantId || 0)) return false
+  return authStore.hasRole('admin')
+})
+
+const handleWorkspaceVisibilityChange = async (value: boolean) => {
+  const kbId = activeKbId.value
+  if (!kbId || visibilitySaving.value) return
+  const previous = kbVisibility.value
+  const next: KnowledgeBaseVisibility = value ? 'workspace' : 'personal'
+  kbVisibility.value = next
+  visibilitySaving.value = true
+  try {
+    await updateKnowledgeBaseVisibility(kbId, next)
+    MessagePlugin.success(t('knowledgeEditor.messages.visibilityUpdateSuccess'))
+  } catch (error) {
+    kbVisibility.value = previous
+    console.error('Failed to update knowledge base visibility:', error)
+    MessagePlugin.error(t('knowledgeEditor.messages.visibilityUpdateFailed'))
+  } finally {
+    visibilitySaving.value = false
+  }
+}
 
 // Backend gate for /knowledge-bases/:id/shares (POST/PUT/DELETE) is
 // g.OwnedKBOrAdmin(): only the KB creator or tenant Admin+ may mutate
@@ -854,6 +903,7 @@ const loadKBData = async (kbIdOverride?: string) => {
     hasFiles.value = (filesResult as any)?.total > 0
     kbCreatorId.value = (kb as any).creator_id || ''
     kbTenantId.value = Number((kb as any).tenant_id || 0)
+    kbVisibility.value = (kb as any).visibility === 'workspace' ? 'workspace' : 'personal'
 
     // 设置表单数据
     const kbType = (kb.type as 'document' | 'faq') || 'document'

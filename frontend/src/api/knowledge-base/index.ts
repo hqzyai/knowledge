@@ -3,6 +3,7 @@ import type { KnowledgeProcessOverrides } from '@/types/knowledgeProcess';
 import type { AuditLog, AuditOutcome, ListAuditLogResponse } from '@/api/tenant/audit-log';
 
 export type KnowledgeBaseActivity = AuditLog;
+export type KnowledgeBaseVisibility = 'personal' | 'workspace';
 
 export interface ListKnowledgeBaseActivityParams {
   after_id?: number;
@@ -160,6 +161,11 @@ export function updateKnowledgeBase(id: string, data: {
   }
 }) {
   return put(`/api/v1/knowledge-bases/${id}`, data);
+}
+
+/** Toggle workspace-local visibility independently from organization sharing. */
+export function updateKnowledgeBaseVisibility(id: string, visibility: KnowledgeBaseVisibility) {
+  return put(`/api/v1/knowledge-bases/${id}/visibility`, { visibility });
 }
 
 export function rebuildKBIndex(kbId: string) {

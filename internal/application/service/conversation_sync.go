@@ -180,6 +180,7 @@ func (s *knowledgeService) ensureConversationKnowledgeBase(
 		candidate := &types.KnowledgeBase{
 			ID:               id,
 			CreatorID:        types.ExternalUserInternalID(tenantID, userID),
+			Visibility:       types.KnowledgeBaseVisibilityPersonal,
 			Name:             conversationKnowledgeBaseName(userID),
 			Description:      "Hermes 自动同步的用户私有对话知识库",
 			Type:             types.KnowledgeBaseTypeDocument,

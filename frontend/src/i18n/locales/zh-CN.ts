@@ -3572,6 +3572,8 @@ export default {
       missingId: '缺少知识库 ID',
       buildDataFailed: '数据构建失败',
       updateSuccess: '配置保存成功',
+      visibilityUpdateSuccess: '知识库访问范围已更新',
+      visibilityUpdateFailed: '知识库访问范围更新失败',
       indexModeRequired: '请选择 FAQ 的索引方式',
       storageChangeConfirm: '知识库中已有文件，更改存储引擎后旧文件可能无法正常访问。是否确认更改？'
     },
@@ -3812,7 +3814,11 @@ export default {
       nameLabel: '知识库名称',
       namePlaceholder: '请输入知识库名称',
       descriptionLabel: '知识库描述',
-      descriptionPlaceholder: '请输入知识库描述（可选）'
+      descriptionPlaceholder: '请输入知识库描述（可选）',
+      workspaceVisibilityLabel: '本空间开放',
+      workspaceVisibilityDescription: '此设置只控制当前空间成员的访问，不影响原有的跨空间共享。',
+      workspaceVisibilityOpen: '已开放：本空间所有成员都可以查看 Wiki、图片和文档，并进行检索与问答。',
+      workspaceVisibilityPersonal: '未开放：仅创建者本人和空间管理员可以查看、检索与问答。'
     },
     errors: {
       vectorStoreBindingInvalid: '无法使用所选向量存储。请选择其他存储或使用系统默认值。',

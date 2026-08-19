@@ -1175,6 +1175,7 @@ func (s *knowledgeBaseService) CopyKnowledgeBase(ctx context.Context,
 			Type:                  sourceKB.Type,
 			Description:           sourceKB.Description,
 			TenantID:              tenantID,
+			Visibility:            types.KnowledgeBaseVisibilityPersonal,
 			ChunkingConfig:        sourceKB.ChunkingConfig,
 			ImageProcessingConfig: sourceKB.ImageProcessingConfig,
 			EmbeddingModelID:      sourceKB.EmbeddingModelID,
@@ -1227,6 +1228,7 @@ func (s *knowledgeBaseService) DuplicateKnowledgeBase(
 	}
 	targetKB.ID = uuid.New().String()
 	targetKB.TenantID = tenantID
+	targetKB.Visibility = types.KnowledgeBaseVisibilityPersonal
 	targetKB.Name = s.buildDuplicateKnowledgeBaseName(ctx, tenantID, sourceKB.Name)
 	targetKB.CreatorID = ""
 	if uid, ok := types.UserIDFromContext(ctx); ok && !types.IsSyntheticUserID(uid) {

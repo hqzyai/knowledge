@@ -138,6 +138,43 @@ func TestWikiReadRoutesDenyCrossTenantKB(t *testing.T) {
 	}
 }
 
+func TestWikiReadRoutesDenyOtherUsersPersonalKB(t *testing.T) {
+	kbLookup := &stubWikiKBLookup{
+		kbs: map[string]*types.KnowledgeBase{
+			"kb-personal": {
+				ID:         "kb-personal",
+				TenantID:   1,
+				CreatorID:  "owner-user",
+				Visibility: types.KnowledgeBaseVisibilityPersonal,
+				Type:       types.KnowledgeBaseTypeWiki,
+			},
+		},
+	}
+	engine := newWikiRouteTestEngine(t, 1, kbLookup)
+
+	paths := []string{
+		"/api/v1/knowledgebase/kb-personal/wiki/pages",
+		"/api/v1/knowledgebase/kb-personal/wiki/pages/secret-page",
+		"/api/v1/knowledgebase/kb-personal/wiki/folders",
+		"/api/v1/knowledgebase/kb-personal/wiki/index",
+		"/api/v1/knowledgebase/kb-personal/wiki/graph",
+		"/api/v1/knowledgebase/kb-personal/wiki/stats",
+		"/api/v1/knowledgebase/kb-personal/wiki/search?q=test",
+		"/api/v1/knowledgebase/kb-personal/wiki/lint",
+		"/api/v1/knowledgebase/kb-personal/wiki/issues",
+		"/api/v1/knowledgebase/kb-personal/wiki/revisions/secret-page",
+	}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			engine.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusForbidden, rec.Code, "body=%s", rec.Body.String())
+		})
+	}
+}
+
 func TestWikiOperationLogRouteIsRemoved(t *testing.T) {
 	engine := newWikiRouteTestEngine(t, 1, tenantKBLookupFixture())
 	rec := httptest.NewRecorder()

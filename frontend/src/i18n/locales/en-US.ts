@@ -2232,7 +2232,11 @@ export default {
       nameLabel: 'Knowledge Base Name',
       namePlaceholder: 'Enter knowledge base name',
       descriptionLabel: 'Knowledge Base Description',
-      descriptionPlaceholder: 'Enter knowledge base description (optional)'
+      descriptionPlaceholder: 'Enter knowledge base description (optional)',
+      workspaceVisibilityLabel: 'Open to this workspace',
+      workspaceVisibilityDescription: 'This setting controls members of the current workspace only and does not change cross-workspace sharing.',
+      workspaceVisibilityOpen: 'Open: all workspace members can view the Wiki, images and documents, and use search and Q&A.',
+      workspaceVisibilityPersonal: 'Private: only the creator and workspace administrators can view, search or ask questions.'
     },
     wiki: {
       title: 'Wiki Settings',
@@ -2471,6 +2475,8 @@ export default {
       missingId: 'Knowledge base ID is missing',
       buildDataFailed: 'Failed to construct submission data',
       updateSuccess: 'Configuration saved successfully',
+      visibilityUpdateSuccess: 'Knowledge base access updated',
+      visibilityUpdateFailed: 'Failed to update knowledge base access',
       indexModeRequired: 'Please select an indexing mode for FAQ knowledge bases',
       storageChangeConfirm: 'This knowledge base already has files. Changing the storage engine may make old files inaccessible. Do you want to proceed?'
     },

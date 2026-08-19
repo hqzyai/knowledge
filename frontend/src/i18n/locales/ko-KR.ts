@@ -3572,6 +3572,8 @@ export default {
       missingId: '지식베이스 ID가 없습니다',
       buildDataFailed: '데이터 구축 실패',
       updateSuccess: '설정 저장 성공',
+      visibilityUpdateSuccess: '지식베이스 접근 범위를 업데이트했습니다',
+      visibilityUpdateFailed: '지식베이스 접근 범위를 업데이트하지 못했습니다',
       indexModeRequired: 'FAQ 인덱스 방식을 선택해주세요',
       storageChangeConfirm: '지식베이스에 파일이 있습니다. 스토리지 엔진을 변경하면 이전 파일에 접근할 수 없게 될 수 있습니다. 계속하시겠습니까?'
     },
@@ -3812,7 +3814,11 @@ export default {
       nameLabel: '지식베이스 이름',
       namePlaceholder: '지식베이스 이름을 입력해주세요',
       descriptionLabel: '지식베이스 설명',
-      descriptionPlaceholder: '지식베이스 설명을 입력해주세요 (선택)'
+      descriptionPlaceholder: '지식베이스 설명을 입력해주세요 (선택)',
+      workspaceVisibilityLabel: '이 워크스페이스에 공개',
+      workspaceVisibilityDescription: '현재 워크스페이스 멤버의 접근만 제어하며 기존 워크스페이스 간 공유에는 영향을 주지 않습니다.',
+      workspaceVisibilityOpen: '공개: 모든 워크스페이스 멤버가 Wiki, 이미지, 문서를 보고 검색 및 Q&A를 사용할 수 있습니다.',
+      workspaceVisibilityPersonal: '비공개: 생성자와 워크스페이스 관리자만 조회, 검색 및 Q&A를 사용할 수 있습니다.'
     },
     errors: {
       vectorStoreBindingInvalid: '선택한 벡터 스토어를 사용할 수 없습니다. 다른 스토어를 선택하거나 시스템 기본값을 사용하세요.',

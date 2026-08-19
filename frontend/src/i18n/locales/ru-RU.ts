@@ -3572,6 +3572,8 @@ export default {
       missingId: 'Отсутствует ID базы знаний',
       buildDataFailed: 'Не удалось сформировать данные для отправки',
       updateSuccess: 'Настройки сохранены',
+      visibilityUpdateSuccess: 'Доступ к базе знаний обновлён',
+      visibilityUpdateFailed: 'Не удалось обновить доступ к базе знаний',
       indexModeRequired: 'Выберите режим индексации для FAQ базы знаний',
       storageChangeConfirm: 'В базе знаний уже есть файлы. Смена хранилища может сделать старые файлы недоступными. Продолжить?'
     },
@@ -3812,7 +3814,11 @@ export default {
       nameLabel: 'Название базы знаний',
       namePlaceholder: 'Введите название базы знаний',
       descriptionLabel: 'Описание базы знаний',
-      descriptionPlaceholder: 'Введите описание базы знаний (необязательно)'
+      descriptionPlaceholder: 'Введите описание базы знаний (необязательно)',
+      workspaceVisibilityLabel: 'Открыть для этого пространства',
+      workspaceVisibilityDescription: 'Настройка управляет доступом только внутри текущего пространства и не меняет существующий межпространственный общий доступ.',
+      workspaceVisibilityOpen: 'Открыто: все участники могут просматривать Wiki, изображения и документы, выполнять поиск и задавать вопросы.',
+      workspaceVisibilityPersonal: 'Личное: просмотр, поиск и вопросы доступны только создателю и администраторам пространства.'
     },
     errors: {
       vectorStoreBindingInvalid: 'The selected vector store cannot be used. Choose a different store or use the system default.',
