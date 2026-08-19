@@ -210,7 +210,7 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	at := time.Date(2026, 8, 17, 9, 30, 0, 0, time.FixedZone("CST", 8*60*60))
 
 	first, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", QAContent: "**问：** 第一问\n\n**答：** 第一答", ConversationAt: &at, EventID: "evt-1",
+		UserID: "hermes-user-1", Text: "**问：** 第一问\n\n**答：** 第一答", ConversationAt: &at, EventID: "evt-1",
 	})
 	require.NoError(t, err)
 	require.True(t, first.KnowledgeBaseCreated)
@@ -220,7 +220,7 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 
 	secondAt := at.Add(2 * time.Hour)
 	second, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", QAContent: "**问：** 第二问\n\n**答：** 第二答", ConversationAt: &secondAt, EventID: "evt-2",
+		UserID: "hermes-user-1", Text: "**问：** 第二问\n\n**答：** 第二答", ConversationAt: &secondAt, EventID: "evt-2",
 	})
 	require.NoError(t, err)
 	require.Equal(t, first.KnowledgeBaseID, second.KnowledgeBaseID)
@@ -229,7 +229,7 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	require.Equal(t, 2, second.ContentVersion)
 
 	replay, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", QAContent: "不应重复", ConversationAt: &secondAt, EventID: "evt-2",
+		UserID: "hermes-user-1", Text: "不应重复", ConversationAt: &secondAt, EventID: "evt-2",
 	})
 	require.NoError(t, err)
 	require.True(t, replay.IdempotentReplay)
@@ -280,7 +280,7 @@ func TestSyncConversationConcurrentAppendsLoseNoContent(t *testing.T) {
 			defer wg.Done()
 			result, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
 				UserID:         "parallel-user",
-				QAContent:      "并发片段-" + time.Unix(int64(i), 0).UTC().Format("05"),
+				Text:           "并发片段-" + time.Unix(int64(i), 0).UTC().Format("05"),
 				ConversationAt: &at,
 				EventID:        "parallel-event-" + time.Unix(int64(i), 0).UTC().Format("05"),
 			})

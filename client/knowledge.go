@@ -819,7 +819,7 @@ type UpdateManualKnowledgeRequest struct {
 // user's Markdown conversation document for the fragment's local day.
 type ConversationSyncRequest struct {
 	UserID         string     `json:"user_id"`
-	QAContent      string     `json:"qa_content"`
+	Text           string     `json:"text"`
 	ConversationAt *time.Time `json:"conversation_at,omitempty"`
 	EventID        string     `json:"event_id,omitempty"`
 }

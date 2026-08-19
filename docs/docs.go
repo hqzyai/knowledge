@@ -16250,7 +16250,7 @@ const docTemplate = `{
         "github_com_Tencent_WeKnora_internal_types.ConversationSyncRequest": {
             "type": "object",
             "required": [
-                "qa_content",
+                "text",
                 "user_id"
             ],
             "properties": {
@@ -16260,7 +16260,7 @@ const docTemplate = `{
                 "event_id": {
                     "type": "string"
                 },
-                "qa_content": {
+                "text": {
                     "type": "string"
                 },
                 "user_id": {

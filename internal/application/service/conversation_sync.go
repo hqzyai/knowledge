@@ -126,18 +126,18 @@ func validateConversationSyncRequest(
 		}
 	}
 
-	qaContent = strings.TrimSpace(secutils.CleanMarkdown(request.QAContent))
+	qaContent = strings.TrimSpace(secutils.CleanMarkdown(request.Text))
 	if qaContent == "" {
-		return "", "", "", werrors.NewValidationError("qa_content 不能为空")
+		return "", "", "", werrors.NewValidationError("text 不能为空")
 	}
 	if safe, ok := secutils.ValidateInput(qaContent); !ok {
-		return "", "", "", werrors.NewValidationError("qa_content 包含非法字符")
+		return "", "", "", werrors.NewValidationError("text 包含非法字符")
 	} else {
 		qaContent = safe
 	}
 	if len([]rune(qaContent)) > manualContentMaxLength {
 		return "", "", "", werrors.NewValidationError(
-			fmt.Sprintf("qa_content 超出长度限制（最多%d个字符）", manualContentMaxLength))
+			fmt.Sprintf("text 超出长度限制（最多%d个字符）", manualContentMaxLength))
 	}
 
 	eventID = strings.TrimSpace(request.EventID)

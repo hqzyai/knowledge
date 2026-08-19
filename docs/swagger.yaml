@@ -651,12 +651,12 @@ definitions:
         type: string
       event_id:
         type: string
-      qa_content:
+      text:
         type: string
       user_id:
         type: string
     required:
-    - qa_content
+    - text
     - user_id
     type: object
   github_com_Tencent_WeKnora_internal_types.ConversationSyncResponse:
