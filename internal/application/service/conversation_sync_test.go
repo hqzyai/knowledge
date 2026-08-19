@@ -250,6 +250,8 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	kb, err := kbs.GetKnowledgeBaseByID(ctx, first.KnowledgeBaseID)
 	require.NoError(t, err)
 	require.Equal(t, types.KnowledgeBaseTypeDocument, kb.Type)
+	require.Equal(t, types.KnowledgeBaseVisibilityPersonal, kb.Visibility,
+		"Hermes conversation knowledge bases must remain private to their creator by default")
 	require.Equal(t, types.ExternalUserInternalID(7, "hermes-user-1"), kb.CreatorID)
 	require.True(t, kb.IndexingStrategy.VectorEnabled)
 	require.True(t, kb.IndexingStrategy.KeywordEnabled)
