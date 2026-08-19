@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -101,6 +102,10 @@ func applyConversationKnowledgeColumns(row *types.Knowledge, values map[string]i
 			row.ErrorMessage, _ = value.(string)
 		case "embedding_model_id":
 			row.EmbeddingModelID, _ = value.(string)
+		case "title":
+			row.Title, _ = value.(string)
+		case "file_name":
+			row.FileName, _ = value.(string)
 		case "processed_at":
 			if value == nil {
 				row.ProcessedAt = nil
@@ -204,13 +209,13 @@ func conversationSyncTestContext() context.Context {
 	return context.WithValue(ctx, types.TenantInfoContextKey, &types.Tenant{ID: 7})
 }
 
-func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testing.T) {
+func TestSyncConversationReplacesOneDailyDocumentAndConfiguresEnrichment(t *testing.T) {
 	svc, repo, kbs, queue := newConversationSyncTestService()
 	ctx := conversationSyncTestContext()
 	at := time.Date(2026, 8, 17, 9, 30, 0, 0, time.FixedZone("CST", 8*60*60))
 
 	first, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", Text: "**问：** 第一问\n\n**答：** 第一答", ConversationAt: &at, EventID: "evt-1",
+		UserID: "hermes-user-1", Title: "8 月 17 日对话", Text: "**问：** 第一问\n\n**答：** 第一答", ConversationAt: &at, EventID: "evt-1",
 	})
 	require.NoError(t, err)
 	require.True(t, first.KnowledgeBaseCreated)
@@ -220,7 +225,7 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 
 	secondAt := at.Add(2 * time.Hour)
 	second, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", Text: "**问：** 第二问\n\n**答：** 第二答", ConversationAt: &secondAt, EventID: "evt-2",
+		UserID: "hermes-user-1", Title: "8 月 17 日对话（续）", Text: "**问：** 第二问\n\n**答：** 第二答", ConversationAt: &secondAt, EventID: "evt-2",
 	})
 	require.NoError(t, err)
 	require.Equal(t, first.KnowledgeBaseID, second.KnowledgeBaseID)
@@ -229,7 +234,7 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	require.Equal(t, 2, second.ContentVersion)
 
 	replay, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
-		UserID: "hermes-user-1", Text: "不应重复", ConversationAt: &secondAt, EventID: "evt-2",
+		UserID: "hermes-user-1", Title: "8 月 17 日对话（续）", Text: "不应重复", ConversationAt: &secondAt, EventID: "evt-2",
 	})
 	require.NoError(t, err)
 	require.True(t, replay.IdempotentReplay)
@@ -242,7 +247,12 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	require.Equal(t, 2, meta.Version)
 	require.Equal(t, types.ConversationSyncSourceHermes, meta.SyncSource)
 	require.Equal(t, "2026-08-17", meta.DocumentDate)
-	require.Equal(t, 1, bytes.Count([]byte(meta.Content), []byte("第一问")))
+	require.Equal(t, "8 月 17 日对话（续）", knowledge.Title)
+	require.Equal(t, "8 月 17 日对话（续）.md", knowledge.FileName)
+	require.True(t, strings.HasPrefix(meta.Content, "# 8 月 17 日对话（续）\n\n"))
+	require.NotContains(t, meta.Content, "09:30:00")
+	require.NotContains(t, meta.Content, "11:30:00")
+	require.NotContains(t, meta.Content, "第一问")
 	require.Equal(t, 1, bytes.Count([]byte(meta.Content), []byte("第二问")))
 	require.NotContains(t, meta.Content, "不应重复")
 	require.Equal(t, 3, queue.count(), "an unindexed idempotent retry is safely re-enqueued")
@@ -256,16 +266,19 @@ func TestSyncConversationAppendsOneDailyDocumentAndConfiguresEnrichment(t *testi
 	require.True(t, kb.IndexingStrategy.VectorEnabled)
 	require.True(t, kb.IndexingStrategy.KeywordEnabled)
 	require.True(t, kb.IndexingStrategy.WikiEnabled)
-	require.True(t, kb.IndexingStrategy.GraphEnabled)
+	require.False(t, kb.IndexingStrategy.GraphEnabled)
 	require.NotNil(t, kb.ExtractConfig)
-	require.True(t, kb.ExtractConfig.Enabled)
+	require.False(t, kb.ExtractConfig.Enabled)
+	require.True(t, kb.ChunkingConfig.EnableParentChild)
+	require.Equal(t, 4096, kb.ChunkingConfig.ParentChunkSize)
+	require.Equal(t, 384, kb.ChunkingConfig.ChildChunkSize)
 	require.NotNil(t, kb.QuestionGenerationConfig)
 	require.True(t, kb.QuestionGenerationConfig.Enabled)
 	require.Equal(t, 3, kb.QuestionGenerationConfig.QuestionCount)
 	require.Equal(t, "chat-default", kb.WikiConfig.SynthesisModelID)
 }
 
-func TestSyncConversationConcurrentAppendsLoseNoContent(t *testing.T) {
+func TestSyncConversationConcurrentReplacementsKeepOneCompleteSnapshot(t *testing.T) {
 	svc, repo, _, _ := newConversationSyncTestService()
 	ctx := conversationSyncTestContext()
 	at := time.Date(2026, 8, 17, 14, 0, 0, 0, time.Local)
@@ -280,6 +293,7 @@ func TestSyncConversationConcurrentAppendsLoseNoContent(t *testing.T) {
 			defer wg.Done()
 			result, err := svc.SyncConversation(ctx, &types.ConversationSyncRequest{
 				UserID:         "parallel-user",
+				Title:          "并发对话",
 				Text:           "并发片段-" + time.Unix(int64(i), 0).UTC().Format("05"),
 				ConversationAt: &at,
 				EventID:        "parallel-event-" + time.Unix(int64(i), 0).UTC().Format("05"),
@@ -308,8 +322,10 @@ func TestSyncConversationConcurrentAppendsLoseNoContent(t *testing.T) {
 	meta, err := knowledge.ManualMetadata()
 	require.NoError(t, err)
 	require.Equal(t, calls, meta.Version)
+	matched := 0
 	for i := 0; i < calls; i++ {
 		fragment := "并发片段-" + time.Unix(int64(i), 0).UTC().Format("05")
-		require.Equal(t, 1, bytes.Count([]byte(meta.Content), []byte(fragment)), fragment)
+		matched += bytes.Count([]byte(meta.Content), []byte(fragment))
 	}
+	require.Equal(t, 1, matched, "the final document must contain exactly one complete request snapshot")
 }

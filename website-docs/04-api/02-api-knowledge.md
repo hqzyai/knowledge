@@ -252,15 +252,16 @@ curl -X POST $BASE/api/v1/knowledge-bases/kb-1/knowledge/manual -H "Authorizatio
 
 ### POST /api/v1/conversation-sync
 
-用途：供 Hermes 等系统按用户同步对话。首次调用会为 `user_id` 创建一个默认私有的文档知识库；每个本地自然日只创建一份 Markdown 文档，后续调用原子追加内容并异步执行全量重分片、向量化、每分片 3 个问题、Wiki 和知识图谱生成。知识库默认选用当前空间的可用默认（或首个可用）Embedding 与 KnowledgeQA 模型。
+用途：供 Hermes 等系统按用户同步每日对话快照。首次调用会为 `user_id` 创建一个默认私有的文档知识库；每个本地自然日只创建一份 Markdown 文档，文档标题由调用方传入。同一天再次调用时，最新的 `title` 和 `text` 会整体覆盖旧文档，并异步执行全量重分片、向量化、每分片 3 个问题和 Wiki 生成。新建知识库默认开启父子分块（parent 4096 / child 384）、关闭知识图谱，并选用当前空间的可用默认（或首个可用）Embedding 与 KnowledgeQA 模型。
 
 权限：JWT Admin+；API Key 调用只要求密钥有效，不检查 Full Access、capability 或知识库白名单。此路由不挂请求限流中间件；后台模型并发限制、任务队列容量及上游模型配额仍正常生效。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `user_id` | string | 是 | Hermes 外部用户 ID，最大 128 字符 |
-| `text` | string | 是 | 要追加的 Markdown/QA 内容 |
-| `conversation_at` | RFC3339 | 否 | 对话发生时间；缺省为服务器当前时间，按服务器本地时区归日 |
+| `title` | string | 是 | 文档标题，同时用于知识标题、Markdown 文件名和正文一级标题 |
+| `text` | string | 是 | 当日完整的 Markdown/QA 内容；同日再次调用会覆盖旧内容 |
+| `conversation_at` | YYYY-MM-DD | 否 | 对话归档日期，例如 `2026-08-18`；兼容 RFC3339，但只取服务器本地日期；缺省为服务器当天 |
 | `event_id` | string | 否 | Hermes 事件唯一 ID；传入后重试不会重复追加 |
 
 响应：202。`parse_status` 通常为 `pending`；可通过现有知识详情/处理阶段接口跟踪异步处理。
@@ -287,8 +288,9 @@ curl -X POST "$BASE/api/v1/conversation-sync" \
   -H 'Content-Type: application/json' \
   -d '{
     "user_id":"hermes-user-123",
+    "title":"2026-08-17 客服对话",
     "event_id":"conversation-message-987",
-    "conversation_at":"2026-08-17T14:35:00+08:00",
+    "conversation_at":"2026-08-17",
     "text":"**问：** 如何重置密码？\n\n**答：** 在设置页选择安全中心。"
   }'
 ```
