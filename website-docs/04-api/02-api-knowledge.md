@@ -259,7 +259,7 @@ curl -X POST $BASE/api/v1/knowledge-bases/kb-1/knowledge/manual -H "Authorizatio
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `user_id` | string | 是 | Hermes 外部用户 ID，最大 128 字符 |
-| `qa_content` | string | 是 | 要追加的 Markdown/QA 内容 |
+| `text` | string | 是 | 要追加的 Markdown/QA 内容 |
 | `conversation_at` | RFC3339 | 否 | 对话发生时间；缺省为服务器当前时间，按服务器本地时区归日 |
 | `event_id` | string | 否 | Hermes 事件唯一 ID；传入后重试不会重复追加 |
 
@@ -289,7 +289,7 @@ curl -X POST "$BASE/api/v1/conversation-sync" \
     "user_id":"hermes-user-123",
     "event_id":"conversation-message-987",
     "conversation_at":"2026-08-17T14:35:00+08:00",
-    "qa_content":"**问：** 如何重置密码？\n\n**答：** 在设置页选择安全中心。"
+    "text":"**问：** 如何重置密码？\n\n**答：** 在设置页选择安全中心。"
   }'
 ```
 

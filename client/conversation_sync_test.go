@@ -22,7 +22,7 @@ func TestSyncConversation(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatal(err)
 		}
-		if request.UserID != "hermes-user" || request.EventID != "evt-1" || request.QAContent != "Q/A" {
+		if request.UserID != "hermes-user" || request.EventID != "evt-1" || request.Text != "Q/A" {
 			t.Fatalf("request body = %+v", request)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -45,7 +45,7 @@ func TestSyncConversation(t *testing.T) {
 
 	api := NewClient(server.URL, WithAPIKey("sk-full"))
 	result, err := api.SyncConversation(context.Background(), &ConversationSyncRequest{
-		UserID: "hermes-user", QAContent: "Q/A", ConversationAt: &at, EventID: "evt-1",
+		UserID: "hermes-user", Text: "Q/A", ConversationAt: &at, EventID: "evt-1",
 	})
 	if err != nil {
 		t.Fatal(err)

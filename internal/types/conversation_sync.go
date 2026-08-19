@@ -8,7 +8,7 @@ const ConversationSyncSourceHermes = "hermes"
 // external user's Markdown document for the fragment's local calendar day.
 type ConversationSyncRequest struct {
 	UserID         string     `json:"user_id" binding:"required"`
-	QAContent      string     `json:"qa_content" binding:"required"`
+	Text           string     `json:"text" binding:"required"`
 	ConversationAt *time.Time `json:"conversation_at,omitempty"`
 	EventID        string     `json:"event_id,omitempty"`
 }
