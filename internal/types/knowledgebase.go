@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"strings"
@@ -34,6 +35,32 @@ const (
 	KnowledgeBaseTypeFAQ      = "faq"
 	KnowledgeBaseTypeWiki     = "wiki"
 )
+
+// KnowledgeBaseVisibility controls access inside the knowledge base's own
+// workspace. It is intentionally independent from organization sharing:
+// cross-workspace access continues to be granted only by knowledge_base_shares
+// or a shared agent.
+type KnowledgeBaseVisibility string
+
+const (
+	// KnowledgeBaseVisibilityPersonal restricts read/search/QA access to the
+	// creator and workspace Admin/Owner callers.
+	KnowledgeBaseVisibilityPersonal KnowledgeBaseVisibility = "personal"
+	// KnowledgeBaseVisibilityWorkspace lets every member of the owning
+	// workspace read, search and ask questions against the knowledge base.
+	KnowledgeBaseVisibilityWorkspace KnowledgeBaseVisibility = "workspace"
+)
+
+// NormalizeKnowledgeBaseVisibility returns a valid value. New or invalid
+// input fails closed to personal.
+func NormalizeKnowledgeBaseVisibility(v KnowledgeBaseVisibility) KnowledgeBaseVisibility {
+	switch KnowledgeBaseVisibility(strings.ToLower(strings.TrimSpace(string(v)))) {
+	case KnowledgeBaseVisibilityWorkspace:
+		return KnowledgeBaseVisibilityWorkspace
+	default:
+		return KnowledgeBaseVisibilityPersonal
+	}
+}
 
 // FAQIndexMode represents the FAQ index mode: only index questions or index questions and answers
 type FAQIndexMode string
@@ -75,6 +102,9 @@ type KnowledgeBase struct {
 	// Nullable for backward compatibility with rows created before the
 	// RBAC migration backfilled the column to the workspace Owner.
 	CreatorID string `yaml:"creator_id"              json:"creator_id"              gorm:"type:varchar(36);index"`
+	// Visibility governs access by members of this same workspace. It does not
+	// grant access to other workspaces and does not replace organization shares.
+	Visibility KnowledgeBaseVisibility `yaml:"visibility"              json:"visibility"              gorm:"type:varchar(16);not null;default:'personal';index"`
 	// Chunking configuration
 	ChunkingConfig ChunkingConfig `yaml:"chunking_config"         json:"chunking_config"         gorm:"type:json"`
 	// Image processing configuration
@@ -731,6 +761,13 @@ func (kb *KnowledgeBase) EnsureDefaults() {
 	if kb.Type == "" {
 		kb.Type = KnowledgeBaseTypeDocument
 	}
+	// Persisted rows are backfilled by migration. Keep an empty legacy
+	// in-memory value untouched here so EffectiveVisibility can preserve old
+	// behaviour for narrow tests and decoders; CreateKnowledgeBase calls
+	// Normalize before persistence, which makes every new KB personal.
+	if strings.TrimSpace(string(kb.Visibility)) != "" {
+		kb.Visibility = NormalizeKnowledgeBaseVisibility(kb.Visibility)
+	}
 	// Clear type-specific configs that don't belong
 	if kb.Type != KnowledgeBaseTypeFAQ {
 		kb.FAQConfig = nil
@@ -881,6 +918,48 @@ func (kb *KnowledgeBase) Normalize() {
 	if kb.VectorStoreID != nil && *kb.VectorStoreID == "" {
 		kb.VectorStoreID = nil
 	}
+	kb.Visibility = NormalizeKnowledgeBaseVisibility(kb.Visibility)
+}
+
+// EffectiveVisibility preserves the pre-migration behaviour for legacy
+// in-memory values (mostly tests and old decoded payloads): an empty value is
+// treated as workspace-visible. Persisted rows cannot be empty after migration,
+// and all new creation paths call EnsureDefaults, which writes personal.
+func (kb *KnowledgeBase) EffectiveVisibility() KnowledgeBaseVisibility {
+	if kb == nil {
+		return KnowledgeBaseVisibilityPersonal
+	}
+	if strings.TrimSpace(string(kb.Visibility)) == "" {
+		return KnowledgeBaseVisibilityWorkspace
+	}
+	return NormalizeKnowledgeBaseVisibility(kb.Visibility)
+}
+
+// CanReadKnowledgeBaseInWorkspace applies only the owning workspace's local
+// visibility rule. Cross-workspace organization and shared-agent grants must be
+// evaluated separately by their existing authorization chains.
+func CanReadKnowledgeBaseInWorkspace(ctx context.Context, kb *KnowledgeBase) bool {
+	if kb == nil {
+		return false
+	}
+	tenantID, ok := TenantIDFromContext(ctx)
+	if !ok || tenantID == 0 || kb.TenantID != tenantID {
+		return false
+	}
+	// Machine credentials retain their existing allow-list semantics. The API
+	// key middleware has already verified capabilities; a restricted key may
+	// read only listed KBs, while an unrestricted administrative key may read
+	// the workspace as before.
+	if scope, ok := TenantAPIKeyScopeFromContext(ctx); ok {
+		return scope.AllowsKnowledgeBase(kb.ID)
+	}
+	if TenantRoleFromContext(ctx).HasPermission(TenantRoleAdmin) {
+		return true
+	}
+	if userID, ok := UserIDFromContext(ctx); ok && userID != "" && kb.CreatorID == userID {
+		return true
+	}
+	return kb.EffectiveVisibility() == KnowledgeBaseVisibilityWorkspace
 }
 
 // SharesStoreWith reports whether two knowledge bases are bound to the same

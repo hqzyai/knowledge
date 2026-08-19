@@ -190,6 +190,44 @@ func TestBuildSearchTargets_ExplicitKnowledgeScopeDisablesRecallThresholds(t *te
 	assert.True(t, targets[0].DisableRecallThresholds)
 }
 
+func TestBuildSearchTargets_RejectsAnotherMembersPersonalKB(t *testing.T) {
+	svc := newTagTargetSessionService()
+	kb := svc.knowledgeBaseService.(*tagTargetKnowledgeBaseService).kbs["doc-kb"]
+	kb.CreatorID = "creator"
+	kb.Visibility = types.KnowledgeBaseVisibilityPersonal
+	ctx := context.WithValue(tagTargetContext(), types.UserIDContextKey, "other")
+	ctx = context.WithValue(ctx, types.TenantRoleContextKey, types.TenantRoleContributor)
+
+	_, err := svc.buildSearchTargets(ctx, 100, []string{"doc-kb"}, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "No permission")
+}
+
+func TestBuildSearchTargets_RejectsPersonalKBViaKnowledgeID(t *testing.T) {
+	svc := newTagTargetSessionService()
+	kb := svc.knowledgeBaseService.(*tagTargetKnowledgeBaseService).kbs["doc-kb"]
+	kb.CreatorID = "creator"
+	kb.Visibility = types.KnowledgeBaseVisibilityPersonal
+	ctx := context.WithValue(tagTargetContext(), types.UserIDContextKey, "other")
+	ctx = context.WithValue(ctx, types.TenantRoleContextKey, types.TenantRoleViewer)
+
+	_, err := svc.buildSearchTargets(ctx, 100, nil, []string{"doc-1"}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "No permission")
+}
+
+func TestBuildSearchTargets_SharedAgentScopeRemainsIndependent(t *testing.T) {
+	svc := newTagTargetSessionService()
+	kb := svc.knowledgeBaseService.(*tagTargetKnowledgeBaseService).kbs["doc-kb"]
+	kb.CreatorID = "creator"
+	kb.Visibility = types.KnowledgeBaseVisibilityPersonal
+	ctx := context.WithValue(tagTargetContext(), sharedAgentKBVisibilityBypassKey{}, true)
+
+	targets, err := svc.buildSearchTargets(ctx, 100, []string{"doc-kb"}, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+}
+
 func TestBuildSearchTargets_DocumentTagScopeIntersectsExplicitKnowledgeIDs(t *testing.T) {
 	svc := newTagTargetSessionService()
 

@@ -827,6 +827,7 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
     description TEXT,
     tenant_id INTEGER NOT NULL,
     creator_id VARCHAR(36),
+    visibility VARCHAR(16) NOT NULL DEFAULT 'personal',
     type VARCHAR(32) NOT NULL DEFAULT 'document',
     chunking_config TEXT NOT NULL DEFAULT '{}',
     image_processing_config TEXT NOT NULL DEFAULT '{}',

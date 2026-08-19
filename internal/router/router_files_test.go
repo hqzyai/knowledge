@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/Tencent/WeKnora/internal/config"
+	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 )
@@ -397,6 +399,56 @@ func newKBScopedFilesTestEngine(
 		newKBScopedFileServeHandler(tenantSvc, global),
 	)
 	return engine
+}
+
+func TestKBScopedFileRouteDenyOtherUsersPersonalKB(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	enabled := true
+	cfg := &config.Config{Tenant: &config.TenantConfig{EnableRBAC: &enabled}}
+	kbLookup := &stubWikiKBLookup{kbs: map[string]*types.KnowledgeBase{
+		"kb-personal": {
+			ID:         "kb-personal",
+			TenantID:   1,
+			CreatorID:  "owner-user",
+			Visibility: types.KnowledgeBaseVisibilityPersonal,
+		},
+	}}
+	guards := &rbacGuards{cfg: cfg, kbService: kbLookup}
+
+	engine := gin.New()
+	engine.Use(middleware.ErrorHandler())
+	engine.Use(func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), types.TenantIDContextKey, uint64(1))
+		ctx = context.WithValue(ctx, types.TenantRoleContextKey, types.TenantRoleViewer)
+		ctx = context.WithValue(ctx, types.UserIDContextKey, "other-user")
+		c.Request = c.Request.WithContext(ctx)
+		c.Set(types.TenantIDContextKey.String(), uint64(1))
+		c.Next()
+	})
+
+	serveKBScopedFiles(
+		engine.Group("/api/v1"),
+		guards,
+		&stubTenantService{get: func(_ context.Context, _ uint64) (*types.Tenant, error) {
+			t.Fatal("tenant lookup must not run when personal KB access is denied")
+			return nil, nil
+		}},
+		&stubFileService{getFile: func(_ context.Context, _ string) (io.ReadCloser, error) {
+			t.Fatal("file lookup must not run when personal KB access is denied")
+			return nil, nil
+		}},
+		nil,
+	)
+
+	filePath := "local://1/exports/private-image.jpg"
+	req := httptest.NewRequest(http.MethodGet,
+		"/api/v1/knowledge-bases/kb-personal/files?file_path="+url.QueryEscape(filePath), nil)
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, req)
+
+	if got := recorder.Code; got != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d body=%s", got, http.StatusForbidden, recorder.Body.String())
+	}
 }
 
 // A tenant whose owner-tenant (10008) storage objects are requested by a

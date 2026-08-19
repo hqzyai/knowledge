@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 
 	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -178,6 +179,43 @@ func TestListKB_EnrichesEnvBoundAndSharedDistinctly(t *testing.T) {
 	if strings.Contains(string(serialized), storeForeign) {
 		t.Fatalf("shared row leaked foreign store UUID: %s", serialized)
 	}
+}
+
+func TestListKB_FiltersPersonalRowsForOrdinaryWorkspaceMember(t *testing.T) {
+	kbs := []*types.KnowledgeBase{
+		{ID: "mine", TenantID: 1, CreatorID: "u-test", Visibility: types.KnowledgeBaseVisibilityPersonal},
+		{ID: "private-other", TenantID: 1, CreatorID: "u-other", Visibility: types.KnowledgeBaseVisibilityPersonal},
+		{ID: "workspace-open", TenantID: 1, CreatorID: "u-other", Visibility: types.KnowledgeBaseVisibilityWorkspace},
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(middleware.ErrorHandler())
+	r.Use(func(c *gin.Context) {
+		c.Set(types.TenantIDContextKey.String(), uint64(1))
+		c.Set(types.UserIDContextKey.String(), "u-test")
+		ctx := context.WithValue(c.Request.Context(), types.TenantIDContextKey, uint64(1))
+		ctx = context.WithValue(ctx, types.UserIDContextKey, "u-test")
+		ctx = context.WithValue(ctx, types.TenantRoleContextKey, types.TenantRoleContributor)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	r.GET("/knowledge-bases", (&KnowledgeBaseHandler{service: &stubListKBService{kbs: kbs}}).ListKnowledgeBases)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/knowledge-bases", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	var envelope struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
+	ids := make([]string, 0, len(envelope.Data))
+	for _, row := range envelope.Data {
+		ids = append(ids, row.ID)
+	}
+	require.ElementsMatch(t, []string{"mine", "workspace-open"}, ids)
 }
 
 func TestListKB_BatchesStoreLookupsToAvoidNPlus1(t *testing.T) {

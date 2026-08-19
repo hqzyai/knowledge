@@ -9,6 +9,7 @@ import (
 
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	"github.com/Tencent/WeKnora/internal/application/repository"
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -108,6 +109,9 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	// Set defaults
 	agent.EnsureDefaults()
 	if err := agent.Config.QuestionSuggestions.Validate(); err != nil {
+		return nil, err
+	}
+	if err := s.validateAgentKnowledgeBaseVisibility(ctx, agent.Config); err != nil {
 		return nil, err
 	}
 
@@ -258,6 +262,9 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 	if !ok {
 		return nil, ErrInvalidTenantID
 	}
+	if err := s.validateAgentKnowledgeBaseVisibility(ctx, agent.Config); err != nil {
+		return nil, err
+	}
 
 	// Handle built-in agents specially using registry
 	if types.IsBuiltinAgentID(agent.ID) {
@@ -307,6 +314,40 @@ func (s *customAgentService) UpdateAgent(ctx context.Context, agent *types.Custo
 
 	logger.Infof(ctx, "Custom agent updated successfully, ID: %s", agent.ID)
 	return existingAgent, nil
+}
+
+// validateAgentKnowledgeBaseVisibility prevents an ordinary member from
+// smuggling another member's personal KB into an agent configuration and then
+// exposing it through the agent/share runtime. "all" is filtered dynamically
+// at execution time; selected IDs are checked at save time.
+func (s *customAgentService) validateAgentKnowledgeBaseVisibility(
+	ctx context.Context, cfg types.CustomAgentConfig,
+) error {
+	if s.kbService == nil || strings.ToLower(strings.TrimSpace(cfg.KBSelectionMode)) == "none" {
+		return nil
+	}
+	ids := uniqueNonEmptyStrings(cfg.KnowledgeBases)
+	if len(ids) == 0 {
+		return nil
+	}
+	kbs, err := s.kbService.GetKnowledgeBasesByIDsOnly(ctx, ids)
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]*types.KnowledgeBase, len(kbs))
+	for _, kb := range kbs {
+		if kb != nil {
+			byID[kb.ID] = kb
+		}
+	}
+	tenantID, _ := types.TenantIDFromContext(ctx)
+	for _, id := range ids {
+		kb := byID[id]
+		if kb != nil && kb.TenantID == tenantID && !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+			return apperrors.NewForbiddenError("No permission to use one or more personal knowledge bases")
+		}
+	}
+	return nil
 }
 
 // updateBuiltinAgent updates a built-in agent's configuration (but not basic info)
@@ -613,6 +654,9 @@ func (s *customAgentService) getSuggestedQuestions(
 			// the @ mention dropdown applies on the frontend.
 			capFilter := tools.DeriveKBFilterForAgent(agent.Config.AgentMode, agent.Config.AllowedTools)
 			for _, kb := range kbs {
+				if !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+					continue
+				}
 				if !capFilter.IsEmpty() &&
 					!tools.KBSatisfiesAgentRequirements(kb.Capabilities(), agent.Config.AgentMode, agent.Config.AllowedTools) {
 					continue
@@ -1113,6 +1157,9 @@ func (s *customAgentService) groupKBIDsByEffectiveTenant(
 			continue
 		}
 		if kb.TenantID == callerTenantID {
+			if !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+				continue
+			}
 			out[callerTenantID] = append(out[callerTenantID], kbID)
 			continue
 		}

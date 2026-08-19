@@ -9,6 +9,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/agent/tools"
 	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
 	"github.com/Tencent/WeKnora/internal/common"
+	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/event"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/modelcontext"
@@ -25,6 +26,7 @@ func (s *sessionService) KnowledgeQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	ctx = withSharedAgentKBVisibilityScope(ctx, req)
 	logger.Infof(
 		ctx,
 		"Knowledge base question answering parameters, session ID: %s, query: %s, webSearchEnabled: %v",
@@ -353,6 +355,14 @@ func (s *sessionService) resolveKnowledgeBasesFromAgent(
 			if kb == nil {
 				return false
 			}
+			// For an agent used inside its own workspace, "all" means every KB
+			// this caller may read, not every row in the tenant. Cross-workspace
+			// shared agents retain their existing explicit share scope.
+			isSharedAgent := sessionTenantID != 0 && sessionTenantID != customAgent.TenantID
+			if !isSharedAgent && kb.TenantID == customAgent.TenantID &&
+				!types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+				return false
+			}
 			if capFilter.IsEmpty() {
 				return true
 			}
@@ -474,6 +484,20 @@ func (s *sessionService) buildSearchTargets(
 			}
 		}
 	}
+	authorizeLocalKB := func(kb *types.KnowledgeBase) error {
+		if kb == nil || kb.TenantID != tenantID || hasSharedAgentKBVisibilityScope(ctx) {
+			return nil
+		}
+		if !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+			return apperrors.NewForbiddenError("No permission to read one or more knowledge bases")
+		}
+		return nil
+	}
+	for _, kb := range kbByID {
+		if err := authorizeLocalKB(kb); err != nil {
+			return nil, err
+		}
+	}
 	userID, _ := types.UserIDFromContext(ctx)
 	resolveKBTenant := func(kbID string) uint64 {
 		if kbTenantMap[kbID] != 0 {
@@ -520,6 +544,31 @@ func (s *sessionService) buildSearchTargets(
 		if err != nil {
 			logger.Warnf(ctx, "Failed to get knowledge batch for search targets: %v", err)
 			return targets, nil // Return what we have, don't fail
+		}
+
+		// Resolve and authorize parent KBs for document-only targets as well;
+		// otherwise a caller could bypass KB visibility by sending knowledge_ids.
+		missingParentIDs := make([]string, 0)
+		for _, k := range knowledgeList {
+			if k != nil && k.KnowledgeBaseID != "" && kbByID[k.KnowledgeBaseID] == nil {
+				missingParentIDs = append(missingParentIDs, k.KnowledgeBaseID)
+			}
+		}
+		missingParentIDs = uniqueNonEmptyStrings(missingParentIDs)
+		if len(missingParentIDs) > 0 {
+			parents, parentErr := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, missingParentIDs)
+			if parentErr != nil {
+				return nil, fmt.Errorf("resolve knowledge parent KBs: %w", parentErr)
+			}
+			for _, kb := range parents {
+				if kb == nil {
+					continue
+				}
+				kbByID[kb.ID] = kb
+				if authErr := authorizeLocalKB(kb); authErr != nil {
+					return nil, authErr
+				}
+			}
 		}
 
 		// Group knowledge IDs by their KB, excluding those already covered by full KB search

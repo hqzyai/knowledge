@@ -411,6 +411,10 @@ func (h *KnowledgeBaseHandler) CreateKnowledgeBase(c *gin.Context) {
 		c.Error(apperrors.NewBadRequestError("Storage provider is not allowed by STORAGE_ALLOW_LIST"))
 		return
 	}
+	// Workspace exposure is an administrator-only operation served by the
+	// dedicated visibility endpoint. A create payload cannot smuggle an open
+	// value past that authorization boundary.
+	req.Visibility = types.KnowledgeBaseVisibilityPersonal
 
 	logger.Infof(ctx, "Creating knowledge base, name: %s", secutils.SanitizeForLog(req.Name))
 	// Create knowledge base using the service
@@ -455,9 +459,23 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		return nil, "", 0, "", apperrors.NewUnauthorizedError("Unauthorized")
 	}
 
-	// Get user ID from context (needed for shared KB permission check)
-	userID, userExists := c.Get(types.UserIDContextKey.String())
 	callerTenantRole := types.TenantRoleFromContext(ctx)
+	// The production auth middleware writes identity to both gin.Keys and the
+	// request context. Keep this handler robust for narrow integrations/tests
+	// that populate only gin.Keys by reconstructing the policy context here.
+	policyCtx := ctx
+	if _, ok := types.TenantIDFromContext(policyCtx); !ok {
+		if tid, ok := tenantID.(uint64); ok && tid != 0 {
+			policyCtx = context.WithValue(policyCtx, types.TenantIDContextKey, tid)
+		}
+	}
+	if _, ok := types.UserIDFromContext(policyCtx); !ok {
+		if uid, exists := c.Get(types.UserIDContextKey.String()); exists {
+			if userID, ok := uid.(string); ok && userID != "" {
+				policyCtx = context.WithValue(policyCtx, types.UserIDContextKey, userID)
+			}
+		}
+	}
 
 	// Get knowledge base ID from URL parameter
 	id := secutils.SanitizeForLog(c.Param("id"))
@@ -484,9 +502,20 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		return nil, id, 0, "", apperrors.NewInternalServerError(err.Error())
 	}
 
-	// Check 1: Verify tenant ownership (owner has full access)
+	// Check 1: same-workspace visibility. Membership alone does not grant read
+	// access to a personal KB; only its creator and workspace Admin/Owner do.
 	if kb.TenantID == tenantID.(uint64) {
-		return kb, id, tenantID.(uint64), types.OrgRoleAdmin, nil
+		if !types.CanReadKnowledgeBaseInWorkspace(policyCtx, kb) {
+			return nil, id, 0, "", apperrors.NewForbiddenError("No permission to access this knowledge base")
+		}
+		permission := types.OrgRoleViewer
+		userID, _ := types.UserIDFromContext(ctx)
+		_, isAPIKey := types.TenantAPIKeyScopeFromContext(ctx)
+		if isAPIKey || callerTenantRole.HasPermission(types.TenantRoleAdmin) ||
+			(userID != "" && kb.CreatorID == userID) {
+			permission = types.OrgRoleAdmin
+		}
+		return kb, id, tenantID.(uint64), permission, nil
 	}
 
 	// Check 2: If not owner, check organization shared access
@@ -543,9 +572,6 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 			}
 		}
 	}
-	_ = userID
-	_ = userExists
-
 	// No permission: not owner and no shared access
 	logger.Warnf(
 		ctx,
@@ -661,6 +687,9 @@ func (h *KnowledgeBaseHandler) ListKnowledgeBases(c *gin.Context) {
 			kbs = filtered
 		}
 		kbs = filterKnowledgeBasesForAPIKeyScope(ctx, kbs)
+		if sourceTenantID == currentTenantID {
+			kbs = filterKnowledgeBasesForWorkspaceVisibility(knowledgeBasePolicyContext(c), kbs)
+		}
 
 		// `all` mode: authoritative server-side capability filter so a client
 		// that bypassed the frontend (old tab, curl, rogue plugin) can't @ a
@@ -702,6 +731,7 @@ func (h *KnowledgeBaseHandler) ListKnowledgeBases(c *gin.Context) {
 		c.Error(apperrors.NewInternalServerError(err.Error()))
 		return
 	}
+	kbs = filterKnowledgeBasesForWorkspaceVisibility(knowledgeBasePolicyContext(c), kbs)
 
 	// Optional creator filter — drives the [All | Mine | Others] segmented
 	// control on the list page. We filter in-process rather than pushing
@@ -773,6 +803,48 @@ func filterKnowledgeBasesForAPIKeyScope(ctx context.Context, kbs []*types.Knowle
 		}
 	}
 	return filtered
+}
+
+// filterKnowledgeBasesForWorkspaceVisibility applies only to rows owned by
+// the active workspace. Cross-workspace organization/shared-agent lists retain
+// their existing authorization semantics and are filtered by those services.
+func filterKnowledgeBasesForWorkspaceVisibility(
+	ctx context.Context, kbs []*types.KnowledgeBase,
+) []*types.KnowledgeBase {
+	if _, isAPIKey := types.TenantAPIKeyScopeFromContext(ctx); isAPIKey {
+		return kbs
+	}
+	tenantID, _ := types.TenantIDFromContext(ctx)
+	filtered := make([]*types.KnowledgeBase, 0, len(kbs))
+	for _, kb := range kbs {
+		// Local visibility and cross-workspace sharing are orthogonal. Rows
+		// already admitted by a cross-workspace share path are left untouched.
+		if kb != nil && kb.TenantID != tenantID {
+			filtered = append(filtered, kb)
+			continue
+		}
+		if types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+			filtered = append(filtered, kb)
+		}
+	}
+	return filtered
+}
+
+func knowledgeBasePolicyContext(c *gin.Context) context.Context {
+	ctx := c.Request.Context()
+	if _, ok := types.TenantIDFromContext(ctx); !ok {
+		if tenantID := c.GetUint64(types.TenantIDContextKey.String()); tenantID != 0 {
+			ctx = context.WithValue(ctx, types.TenantIDContextKey, tenantID)
+		}
+	}
+	if _, ok := types.UserIDFromContext(ctx); !ok {
+		if value, exists := c.Get(types.UserIDContextKey.String()); exists {
+			if userID, ok := value.(string); ok && userID != "" {
+				ctx = context.WithValue(ctx, types.UserIDContextKey, userID)
+			}
+		}
+	}
+	return ctx
 }
 
 // enrichKBCreatorNames 把 KB 列表里的 CreatorID 批量解析成展示名（username
@@ -936,6 +1008,65 @@ func (h *KnowledgeBaseHandler) UpdateKnowledgeBase(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    buildKBResponse(kb, h.resolveKBStoreView(ctx, kb, callerTenantID), nil),
+	})
+}
+
+// UpdateKnowledgeBaseVisibilityRequest is deliberately separate from the
+// general KB update DTO. Workspace-local exposure is an Admin/Owner operation
+// and must not be confused with cross-workspace organization sharing.
+type UpdateKnowledgeBaseVisibilityRequest struct {
+	Visibility types.KnowledgeBaseVisibility `json:"visibility" binding:"required,oneof=personal workspace"`
+}
+
+// UpdateKnowledgeBaseVisibility changes whether ordinary members of the
+// owning workspace can read/search/QA this KB. The route is Admin-gated and
+// this handler additionally locks the update to the caller's own tenant so a
+// cross-workspace share can never mutate the source KB's visibility.
+func (h *KnowledgeBaseHandler) UpdateKnowledgeBaseVisibility(c *gin.Context) {
+	ctx := c.Request.Context()
+	var req UpdateKnowledgeBaseVisibilityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.Error(apperrors.NewBadRequestError("visibility must be personal or workspace").WithDetails(err.Error()))
+		return
+	}
+
+	callerTenantID := c.GetUint64(types.TenantIDContextKey.String())
+	if callerTenantID == 0 {
+		c.Error(apperrors.NewUnauthorizedError("Unauthorized"))
+		return
+	}
+	kb, err := h.service.GetKnowledgeBaseByID(ctx, c.Param("id"))
+	if err != nil {
+		if stderrors.Is(err, repository.ErrKnowledgeBaseNotFound) {
+			c.Error(apperrors.NewNotFoundError("knowledge base not found"))
+			return
+		}
+		c.Error(apperrors.NewInternalServerError(err.Error()))
+		return
+	}
+	if kb == nil || kb.TenantID != callerTenantID {
+		c.Error(apperrors.NewForbiddenError("cannot change visibility of a shared knowledge base"))
+		return
+	}
+
+	kb.Visibility = types.NormalizeKnowledgeBaseVisibility(req.Visibility)
+	kb.UpdatedAt = time.Now()
+	if err := h.service.GetRepository().UpdateKnowledgeBase(ctx, kb); err != nil {
+		logger.ErrorWithFields(ctx, err, map[string]interface{}{
+			"knowledge_base_id": secutils.SanitizeForLog(kb.ID),
+			"tenant_id":         callerTenantID,
+		})
+		c.Error(apperrors.NewInternalServerError("failed to update knowledge base visibility"))
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": buildKBResponse(
+			kb,
+			h.resolveKBStoreView(ctx, kb, callerTenantID),
+			nil,
+		),
 	})
 }
 

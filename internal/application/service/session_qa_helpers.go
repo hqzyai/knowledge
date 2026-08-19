@@ -9,6 +9,28 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
+// sharedAgentKBVisibilityBypassKey marks a server-resolved cross-workspace
+// shared-agent execution. That path is authorized by the existing agent share
+// relation and must remain independent from the source workspace's local
+// personal/workspace visibility switch.
+type sharedAgentKBVisibilityBypassKey struct{}
+
+func withSharedAgentKBVisibilityScope(ctx context.Context, req *types.QARequest) context.Context {
+	if req == nil || !req.SharedAgentReadOnly || req.CustomAgent == nil || req.Session == nil {
+		return ctx
+	}
+	if req.Session.TenantID == 0 || req.CustomAgent.TenantID == 0 ||
+		req.Session.TenantID == req.CustomAgent.TenantID {
+		return ctx
+	}
+	return context.WithValue(ctx, sharedAgentKBVisibilityBypassKey{}, true)
+}
+
+func hasSharedAgentKBVisibilityScope(ctx context.Context) bool {
+	v, _ := ctx.Value(sharedAgentKBVisibilityBypassKey{}).(bool)
+	return v
+}
+
 // ---------------------------------------------------------------------------
 // Shared QA helpers: KB resolution, model resolution, retrieval tenant
 // ---------------------------------------------------------------------------
