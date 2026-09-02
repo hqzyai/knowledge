@@ -267,11 +267,12 @@ func (k *TenantAPIKey) AfterFind(tx *gorm.DB) error {
 
 // TenantAPIKeyScope is the request-context projection used by middleware.
 type TenantAPIKeyScope struct {
-	KeyID            uint64
-	ScopeType        APIKeyScopeType
-	FullAccess       bool
-	KnowledgeBaseIDs StringArray
-	Capabilities     StringArray
+	KeyID                       uint64
+	ScopeType                   APIKeyScopeType
+	FullAccess                  bool
+	KnowledgeBaseIDs            StringArray
+	Capabilities                StringArray
+	IncludeWorkspaceVisibleRead bool
 }
 
 func WithTenantAPIKeyScope(ctx context.Context, scope TenantAPIKeyScope) context.Context {
@@ -291,11 +292,12 @@ func TenantAPIKeyScopeFromContext(ctx context.Context) (TenantAPIKeyScope, bool)
 
 func (s TenantAPIKeyScope) Normalize() TenantAPIKeyScope {
 	return TenantAPIKeyScope{
-		KeyID:            s.KeyID,
-		ScopeType:        NormalizeAPIKeyScopeType(s.ScopeType),
-		FullAccess:       s.FullAccess,
-		KnowledgeBaseIDs: normalizeIDArray(s.KnowledgeBaseIDs),
-		Capabilities:     NormalizeAPIKeyCapabilities(s.Capabilities),
+		KeyID:                       s.KeyID,
+		ScopeType:                   NormalizeAPIKeyScopeType(s.ScopeType),
+		FullAccess:                  s.FullAccess,
+		KnowledgeBaseIDs:            normalizeIDArray(s.KnowledgeBaseIDs),
+		Capabilities:                NormalizeAPIKeyCapabilities(s.Capabilities),
+		IncludeWorkspaceVisibleRead: s.IncludeWorkspaceVisibleRead,
 	}
 }
 
@@ -336,6 +338,22 @@ func (s TenantAPIKeyScope) AllowsKnowledgeBase(kbID string) bool {
 
 func (s TenantAPIKeyScope) IsKnowledgeBaseRestricted() bool {
 	return len(s.Normalize().KnowledgeBaseIDs) > 0
+}
+
+// AllowsWorkspaceVisibleRead reports whether this credential may dynamically
+// read workspace-visible KBs in addition to its stable KB allow-list. This is
+// deliberately read-only: write authorization continues to use
+// AllowsKnowledgeBase and therefore never inherits this grant.
+func (s TenantAPIKeyScope) AllowsWorkspaceVisibleRead() bool {
+	s = s.Normalize()
+	return !s.IsPlatform() && s.IncludeWorkspaceVisibleRead
+}
+
+// TenantAPIKeyAllowsWorkspaceVisibleRead is the context-level convenience used
+// by read pipelines that can validate the resolved KB object later.
+func TenantAPIKeyAllowsWorkspaceVisibleRead(ctx context.Context) bool {
+	scope, ok := TenantAPIKeyScopeFromContext(ctx)
+	return ok && scope.AllowsWorkspaceVisibleRead()
 }
 
 func (s TenantAPIKeyScope) AllowsKnowledgeBases(kbIDs []string) bool {
@@ -382,6 +400,24 @@ func AuthorizeTenantAPIKeyKnowledgeBases(ctx context.Context, kbIDs ...string) e
 		return errors.NewForbiddenError("API key scope does not allow one or more knowledge bases")
 	}
 	return nil
+}
+
+// AuthorizeTenantAPIKeyKnowledgeBaseRead validates a resolved KB against the
+// credential's read scope. Explicit allow-list entries remain authoritative;
+// the optional dynamic grant applies only to workspace-visible KBs owned by the
+// caller's current workspace.
+func AuthorizeTenantAPIKeyKnowledgeBaseRead(ctx context.Context, kb *KnowledgeBase) error {
+	scope, ok := TenantAPIKeyScopeFromContext(ctx)
+	if !ok || !scope.IsKnowledgeBaseRestricted() {
+		return nil
+	}
+	if kb != nil && scope.AllowsKnowledgeBase(kb.ID) {
+		return nil
+	}
+	if kb != nil && scope.AllowsWorkspaceVisibleRead() && CanReadKnowledgeBaseInWorkspace(ctx, kb) {
+		return nil
+	}
+	return errors.NewForbiddenError("API key scope does not allow this knowledge base")
 }
 
 // AuthorizeTenantAPIKeyKnowledgeTargets rejects KB-restricted API key callers

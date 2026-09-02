@@ -93,3 +93,21 @@ func TestAttachTargetedPlatformAPIKeyKeepsPlatformPrincipal(t *testing.T) {
 		t.Fatalf("user = %#v, ok=%v", user, ok)
 	}
 }
+
+func TestExternalUserKeyIncludesWorkspaceVisibleRead(t *testing.T) {
+	if !externalUserKeyIncludesWorkspaceVisibleRead(&types.TenantAPIKey{
+		Name: "external-user/user-1",
+	}) {
+		t.Fatal("external-user key should receive the dynamic workspace-visible read grant")
+	}
+	if externalUserKeyIncludesWorkspaceVisibleRead(&types.TenantAPIKey{
+		Name: "manual-scoped-key",
+	}) {
+		t.Fatal("ordinary scoped keys must retain their hard KB allow-list")
+	}
+	if externalUserKeyIncludesWorkspaceVisibleRead(&types.TenantAPIKey{
+		Name: "external-user/user-1", FullAccess: true,
+	}) {
+		t.Fatal("full-access keys do not need or carry the dynamic grant")
+	}
+}

@@ -168,8 +168,10 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 
 	// Merge @mentioned items into knowledge_base_ids and knowledge_ids
 	kbIDs, knowledgeIDs := mergeKnowledgeTargets(request.KnowledgeBaseIDs, request.KnowledgeIds, request.MentionedItems)
-	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, kbIDs, knowledgeIDs); err != nil {
-		return nil, nil, err
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, kbIDs, knowledgeIDs); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// The built-in wiki fixer is invoked from a KB page, not from a tenant's
@@ -331,8 +333,10 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		return nil, nil, errors.NewBadRequestError(err.Error())
 	}
 	tagScopes := mergeTagScopesFromRequestIDs(mentionScopes, requestTagIDs, secutils.SanitizeForLogArray(kbIDs))
-	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
-		return nil, nil, err
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+			return nil, nil, err
+		}
 	}
 	tagIDs := dedupRequestStrings(append(request.TagIDs, mentionedIDsByType(request.MentionedItems, "tag")...))
 	mcpServiceIDs := dedupRequestStrings(append(request.MCPServiceIDs, mentionedIDsByType(request.MentionedItems, "mcp")...))
@@ -762,9 +766,11 @@ func (h *Handler) SearchKnowledge(c *gin.Context) {
 		return
 	}
 	tagScopes := mergeTagScopesFromRequestIDs(mentionScopes, requestTagIDs, secutils.SanitizeForLogArray(knowledgeBaseIDs))
-	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
-		c.Error(err)
-		return
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+			c.Error(err)
+			return
+		}
 	}
 
 	if len(knowledgeBaseIDs) == 0 && len(request.KnowledgeIDs) == 0 && len(tagScopes) == 0 {
@@ -772,9 +778,11 @@ func (h *Handler) SearchKnowledge(c *gin.Context) {
 		c.Error(errors.NewBadRequestError("At least one knowledge_base_id, knowledge_base_ids, knowledge_ids, or scoped tag must be provided"))
 		return
 	}
-	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, knowledgeBaseIDs, request.KnowledgeIDs); err != nil {
-		c.Error(err)
-		return
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, knowledgeBaseIDs, request.KnowledgeIDs); err != nil {
+			c.Error(err)
+			return
+		}
 	}
 
 	logger.Infof(

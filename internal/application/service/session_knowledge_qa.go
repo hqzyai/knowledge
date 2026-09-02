@@ -477,15 +477,34 @@ func (s *sessionService) buildSearchTargets(
 		kbs, kbFetchErr := s.knowledgeBaseService.GetKnowledgeBasesByIDsOnly(ctx, kbIDsToFetch)
 		if kbFetchErr != nil {
 			logger.Warnf(ctx, "Failed to fetch knowledge bases for search targets: %v", kbFetchErr)
+			// External-user keys defer allow-list enforcement until KB metadata
+			// is available so workspace visibility can be checked. That path must
+			// fail closed when metadata cannot be loaded.
+			if types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+				return nil, fmt.Errorf("resolve knowledge bases for API key scope: %w", kbFetchErr)
+			}
 		}
 		for _, kb := range kbs {
 			if kb != nil {
 				kbByID[kb.ID] = kb
 			}
 		}
+		if types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+			for _, kbID := range kbIDsToFetch {
+				if kbByID[kbID] == nil {
+					return nil, apperrors.NewForbiddenError("API key scope cannot verify one or more knowledge bases")
+				}
+			}
+		}
 	}
 	authorizeLocalKB := func(kb *types.KnowledgeBase) error {
-		if kb == nil || kb.TenantID != tenantID || hasSharedAgentKBVisibilityScope(ctx) {
+		if kb == nil {
+			return nil
+		}
+		if err := types.AuthorizeTenantAPIKeyKnowledgeBaseRead(ctx, kb); err != nil {
+			return err
+		}
+		if kb.TenantID != tenantID || hasSharedAgentKBVisibilityScope(ctx) {
 			return nil
 		}
 		if !types.CanReadKnowledgeBaseInWorkspace(ctx, kb) {
@@ -864,11 +883,13 @@ func (s *sessionService) SearchKnowledge(ctx context.Context,
 	logger.Info(ctx, "Start knowledge base search without LLM summary")
 	logger.Infof(ctx, "Knowledge base search parameters, knowledge base IDs: %v, knowledge IDs: %v, tag scopes: %d, query: %s",
 		knowledgeBaseIDs, knowledgeIDs, len(tagScopes), query)
-	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, knowledgeBaseIDs, knowledgeIDs); err != nil {
-		return nil, err
-	}
-	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
-		return nil, err
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, knowledgeBaseIDs, knowledgeIDs); err != nil {
+			return nil, err
+		}
+		if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, tagScopes); err != nil {
+			return nil, err
+		}
 	}
 
 	// Get tenant ID from context

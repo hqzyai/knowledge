@@ -242,10 +242,21 @@ func RequireKBAccess(
 		}
 
 		ctx := c.Request.Context()
+		deferWorkspaceVisibleReadCheck := false
 		if err := types.AuthorizeTenantAPIKeyKnowledgeBases(ctx, kbID); err != nil {
-			_ = c.Error(err)
-			c.Abort()
-			return
+			// External-user keys keep a stable allow-list for their personal KBs
+			// while workspace-visible KBs are granted dynamically. We need the
+			// resolved KB object to validate that read-only exception, so defer it
+			// until after the normal ownership/share resolution below. Mutating
+			// routes never take this path.
+			if requiredPermission == types.OrgRoleViewer &&
+				types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+				deferWorkspaceVisibleReadCheck = true
+			} else {
+				_ = c.Error(err)
+				c.Abort()
+				return
+			}
 		}
 
 		// Rollout window: enforcement off -> log the would-be check and
@@ -274,6 +285,15 @@ func RequireKBAccess(
 			c.Abort()
 			return
 		case stderrors.Is(err, errKBAccessForbidden):
+			// RBAC can run in observe-only mode during rollout, but API-key
+			// scope is always an enforcement boundary. A deferred dynamic-read
+			// check means the stable allow-list already rejected this KB and the
+			// resolved object was not workspace-readable, so never fail open.
+			if deferWorkspaceVisibleReadCheck {
+				_ = c.Error(apperrors.NewForbiddenError("API key scope does not allow this knowledge base"))
+				c.Abort()
+				return
+			}
 			if !enforcing {
 				logger.Warnf(ctx, "[rbac] kb-access would 403 (enforcement off): kb=%s required=%s",
 					kbID, requiredPermission)
@@ -294,6 +314,14 @@ func RequireKBAccess(
 			_ = c.Error(apperrors.NewServiceUnavailableError("cannot verify KB access right now"))
 			c.Abort()
 			return
+		}
+
+		if deferWorkspaceVisibleReadCheck {
+			if err := types.AuthorizeTenantAPIKeyKnowledgeBaseRead(ctx, access.KnowledgeBase); err != nil {
+				_ = c.Error(err)
+				c.Abort()
+				return
+			}
 		}
 
 		// Stash the resolution and rewrite the request to carry the

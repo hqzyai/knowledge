@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ExternalUserDefaultTenantID is the fixed workspace that receives users
-// provisioned by trusted external systems.
+// ExternalUserDefaultTenantID is the fixed system workspace that receives
+// users provisioned by trusted external systems.
 const ExternalUserDefaultTenantID uint64 = 10000
 
 // ExternalUserAPIKeyNamePrefix reserves a deterministic API-key namespace for
@@ -27,7 +27,10 @@ type ExternalUserCreateRequest struct {
 }
 
 // ExternalUserCreateResult contains both the human account and its
-// conversation-only, KB-scoped machine credential.
+// conversation-only machine credential. KnowledgeBaseIDs is the credential's
+// stable personal allow-list; same-workspace KBs marked workspace-visible are
+// additionally authorized at read time and are intentionally not copied into
+// this array.
 type ExternalUserCreateResult struct {
 	ExternalUserID   string      `json:"external_user_id"`
 	UserID           string      `json:"user_id"`

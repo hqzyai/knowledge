@@ -766,7 +766,7 @@ func (h *TenantHandler) UpdateAPIKey(c *gin.Context) {
 
 // CreateExternalUser godoc
 // @Summary      创建外部系统用户
-// @Description  在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证
+// @Description  在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的 API Key；该 Key 可读取自身白名单知识库及同空间公开知识库，相同 user_id 重试会返回同一用户和凭证
 // @Tags         空间管理
 // @Accept       json
 // @Produce      json
@@ -851,9 +851,10 @@ func (h *TenantHandler) CreateExternalUser(c *gin.Context) {
 }
 
 // ensureExternalUserConversationAPIKey gives each externally provisioned user
-// a stable key limited to chat, retrieval, agent reads, and that user's
-// deterministic conversation KB IDs. API keys are stored encrypted by the
-// model hook when SYSTEM_AES_KEY is configured.
+// a stable key limited to chat, retrieval, agent reads, that user's
+// deterministic conversation KB IDs, and dynamic read-only access to
+// workspace-visible KBs. API keys are stored encrypted by the model hook when
+// SYSTEM_AES_KEY is configured.
 func (h *TenantHandler) ensureExternalUserConversationAPIKey(
 	ctx context.Context, tenantID uint64, userID, externalUserID string,
 ) (*types.TenantAPIKey, bool, error) {
