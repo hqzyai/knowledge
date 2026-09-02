@@ -125,9 +125,9 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
 
 ### POST /api/v1/external-users
 
-用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10001`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，并将知识库白名单预绑定到该用户可能创建的 Hermes 对话知识库 ID。
+用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10000`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，并将知识库白名单预绑定到该用户可能创建的 Hermes 对话知识库 ID。
 
-权限：空间 `10001` 的 Owner JWT，或该空间已有的 Full Access API Key。接口不会接受其它空间的凭证。
+权限：空间 `10000` 的 Owner JWT，或该空间已有的 Full Access API Key。接口不会接受其它空间的凭证。
 
 请求：
 
@@ -152,7 +152,7 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
     "user_id": "9f8f...",
     "username": "hermes_user_123",
     "email": "user123@example.com",
-    "space_id": 10001,
+    "space_id": 10000,
     "role": "contributor",
     "api_key_id": 91,
     "api_key": "sk-...",

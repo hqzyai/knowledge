@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSQLiteMigrationsIncludeAutoTagConfig(t *testing.T) {
+func openMigratedSQLiteDB(t *testing.T) *sql.DB {
+	t.Helper()
 	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
 	require.NoError(t, err)
 	previousDir, err := os.Getwd()
@@ -23,6 +24,11 @@ func TestSQLiteMigrationsIncludeAutoTagConfig(t *testing.T) {
 	db, err := sql.Open("sqlite3", dbPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func TestSQLiteMigrationsIncludeAutoTagConfig(t *testing.T) {
+	db := openMigratedSQLiteDB(t)
 
 	rows, err := db.Query("PRAGMA table_info(knowledge_bases)")
 	require.NoError(t, err)
@@ -41,4 +47,41 @@ func TestSQLiteMigrationsIncludeAutoTagConfig(t *testing.T) {
 	}
 	require.NoError(t, rows.Err())
 	require.True(t, found, "SQLite migrations must create knowledge_bases.auto_tag_config")
+}
+
+func TestSQLiteMigrationsSeedHQZYSystemAdmin(t *testing.T) {
+	db := openMigratedSQLiteDB(t)
+
+	var tenantName, tenantStatus string
+	require.NoError(t, db.QueryRow(
+		"SELECT name, status FROM tenants WHERE id = ?", 10000,
+	).Scan(&tenantName, &tenantStatus))
+	require.Equal(t, "HQZY System Workspace", tenantName)
+	require.Equal(t, "active", tenantStatus)
+
+	var userID, passwordHash string
+	var tenantID int
+	var active, allTenants, systemAdmin bool
+	require.NoError(t, db.QueryRow(`
+		SELECT id, password_hash, tenant_id, is_active,
+		       can_access_all_tenants, is_system_admin
+		  FROM users
+		 WHERE email = ?`, "hqzy@admin.com",
+	).Scan(&userID, &passwordHash, &tenantID, &active, &allTenants, &systemAdmin))
+	require.Equal(t, "2ca4d585-f20d-57e1-bac9-87bdbbdb7ea8", userID)
+	require.Equal(t, 10000, tenantID)
+	require.True(t, active)
+	require.True(t, allTenants)
+	require.True(t, systemAdmin)
+	require.NotEmpty(t, passwordHash)
+	require.NotEqual(t, "hqzy@admin.com", passwordHash)
+
+	var role, membershipStatus string
+	require.NoError(t, db.QueryRow(`
+		SELECT role, status
+		  FROM tenant_members
+		 WHERE user_id = ? AND tenant_id = ? AND deleted_at IS NULL`, userID, 10000,
+	).Scan(&role, &membershipStatus))
+	require.Equal(t, "owner", role)
+	require.Equal(t, "active", membershipStatus)
 }
