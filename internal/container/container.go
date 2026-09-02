@@ -1036,13 +1036,14 @@ func initRawFileService(_ *config.Config) (interfaces.FileService, error) {
 		if pathPrefix == "" {
 			pathPrefix = "weknora/"
 		}
-		return file.NewS3FileService(
+		return file.NewS3FileServiceWithOptions(
 			os.Getenv("S3_ENDPOINT"),
 			accessKey,
 			secretKey,
 			os.Getenv("S3_BUCKET_NAME"),
 			os.Getenv("S3_REGION"),
 			pathPrefix,
+			strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "true"),
 		)
 	case "obs":
 		if os.Getenv("OBS_ENDPOINT") == "" ||

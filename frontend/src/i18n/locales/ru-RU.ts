@@ -277,7 +277,11 @@ export default {
       copy: 'Копировать',
       copyEnvSuccess: 'Пример переменных скопирован',
       copyCmdSuccess: 'Команда установки скопирована',
-      ecosystemNote: 'Skill размещён на ClawHub ({\'@\'}lyingbug/weknora). Полная документация API — на странице ClawHub.',
+      downloadCta: 'Скачать папку Skill',
+      downloadCtaHint: 'ZIP содержит текущий API URL · нужен только API Key',
+      downloadSuccess: 'Загрузка WeKnora Skill началась',
+      downloadFailed: 'Не удалось скачать Skill. Повторите попытку позже.',
+      ecosystemNote: 'Прямая загрузка основана на ClawHub {\'@\'}lyingbug/weknora и содержит текущий URL API WeKnora.',
       installCta: 'Открыть ClawHub',
       installCtaHint: 'Установка WeKnora Skill · откроется в новой вкладке',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0',
@@ -286,17 +290,17 @@ export default {
           title: 'Проверка',
           desc: 'Попросите агента вывести список БЗ или выполнить поиск.'
         },
-        install: {
-          title: 'Установка Skill',
-          desc: 'Выполните команду ниже в среде с OpenClaw CLI или следуйте инструкциям на ClawHub.'
+        download: {
+          title: 'Скачайте и установите Skill',
+          desc: 'Скачайте ZIP выше, распакуйте его и установите папку weknora. URL API уже записан в Skill.'
         },
         env: {
-          title: 'Переменные окружения',
-          desc: 'Задайте WEKNORA_BASE_URL и WEKNORA_API_KEY в shell или ~/.zshrc / ~/.bashrc. Пример ниже использует текущий API URL — замените API Key на фактическое значение.'
+          title: 'Настройте API Key',
+          desc: 'Задайте WEKNORA_API_KEY в среде OpenClaw. WEKNORA_BASE_URL обычно больше не требуется.'
         },
         api: {
           title: 'API-учётные данные',
-          desc: 'Скопируйте API Key и URL в «Настройки → API-информация».'
+          desc: 'Создайте или скопируйте API Key в «Настройки → API-информация». Текущий API URL добавляется при скачивании.'
         }
       },
       capabilities: {

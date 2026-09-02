@@ -5,6 +5,7 @@
 | 方法 | 路径      | 描述               |
 | ---- | --------- | ------------------ |
 | GET  | `/skills` | 获取预装 Skills 列表 |
+| GET  | `/skills/weknora/download` | 下载已写入 API 地址的 Skill |
 | POST | `/sandbox-configs/{id}/skills` | 安装技能（zip 上传或托管平台 source） |
 | POST | `/sandbox-configs/{id}/skills/{skillId}/reinstall` | 用已保存的安装包重试安装 |
 | POST | `/sandbox-configs/{id}/skills/{skillId}/stop` | 停止卡住的安装 |
@@ -302,4 +303,17 @@ curl --location --request PUT 'http://localhost:8080/api/v1/me/env-vars/sandbox'
 --header 'Authorization: Bearer <token>' \
 --header 'Content-Type: application/json' \
 --data '{"sandbox_config_id":"cfg-1","name":"HTTP_PROXY","value":"http://127.0.0.1:7890"}'
+```
+
+## GET `/skills/weknora/download` - 下载 WeKnora Skill
+
+返回 `weknora-skill.zip`。压缩包内是可直接安装的 `weknora/` 文件夹；生成的 `SKILL.md` 只要求环境变量 `WEKNORA_API_KEY`。
+
+可选查询参数 `base_url` 必须是以 `/api/v1` 结尾的绝对 HTTP(S) URL。省略时写入 Docker Compose 服务地址 `http://app:8080/api/v1`。
+
+```curl
+curl --get 'http://localhost:8080/api/v1/skills/weknora/download' \
+  --header 'X-API-Key: sk-xxxxx' \
+  --data-urlencode 'base_url=https://weknora.example.com/api/v1' \
+  --output weknora-skill.zip
 ```

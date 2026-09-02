@@ -277,7 +277,11 @@ export default {
       copy: '복사',
       copyEnvSuccess: '환경 변수 예시가 복사되었습니다',
       copyCmdSuccess: '설치 명령이 복사되었습니다',
-      ecosystemNote: 'Skill은 ClawHub({\'@\'}lyingbug/weknora)에 호스팅됩니다. 전체 API 문서는 ClawHub 페이지를 참고하세요.',
+      downloadCta: 'Skill 폴더 다운로드',
+      downloadCtaHint: 'ZIP에 현재 API URL 포함 · API Key만 필요',
+      downloadSuccess: 'WeKnora Skill 다운로드가 시작되었습니다',
+      downloadFailed: 'Skill을 다운로드하지 못했습니다. 잠시 후 다시 시도하세요.',
+      ecosystemNote: '직접 다운로드 버전은 ClawHub {\'@\'}lyingbug/weknora를 기반으로 하며 현재 WeKnora API URL을 포함합니다.',
       installCta: 'ClawHub 열기',
       installCtaHint: 'WeKnora Skill 설치 · 새 탭에서 열림',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0',
@@ -286,17 +290,17 @@ export default {
           title: '연결 확인',
           desc: '에이전트로 지식베이스 목록 또는 검색을 실행해 연결을 확인하세요.'
         },
-        install: {
-          title: 'Skill 설치',
-          desc: 'OpenClaw CLI가 설치된 환경에서 아래 명령을 실행하거나 ClawHub 안내를 따르세요.'
+        download: {
+          title: 'Skill 다운로드 및 설치',
+          desc: '위 ZIP을 다운로드하고 압축을 푼 다음 포함된 weknora 폴더를 설치하세요. API URL은 이미 포함되어 있습니다.'
         },
         env: {
-          title: '환경 변수 설정',
-          desc: '셸 또는 ~/.zshrc, ~/.bashrc에 WEKNORA_BASE_URL과 WEKNORA_API_KEY를 설정하세요. 아래 예시는 현재 API 주소를 사용하며, API Key는 실제 값으로 바꾸세요.'
+          title: 'API Key 설정',
+          desc: 'OpenClaw 실행 환경에 WEKNORA_API_KEY만 설정하세요. 일반적으로 WEKNORA_BASE_URL은 더 이상 필요하지 않습니다.'
         },
         api: {
           title: 'API 자격 증명',
-          desc: '설정 → API 정보에서 API Key와 주소를 복사하세요.'
+          desc: '설정 → API 정보에서 API Key를 만들거나 복사하세요. 현재 API URL은 다운로드 시 자동으로 포함됩니다.'
         }
       },
       capabilities: {

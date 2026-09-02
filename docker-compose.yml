@@ -97,8 +97,8 @@ services:
       # 启动时自动执行数据库迁移；设为 false 禁用，默认启用
       - AUTO_MIGRATE=${AUTO_MIGRATE:-true}
       # IM 渠道图片/文件外链的外部可达 URL。IM 显示知识库图片需二选一：
-      # 存储后端公网可达（如 MINIO_ENDPOINT 设为公网），或设本变量走 <APP_EXTERNAL_URL>/r/<token>（需 nginx 代理 /r/）。
-      # 默认 MinIO 内网部署 / local 后端需设本变量。
+      # 存储后端公网可达（如 S3_ENDPOINT 设为公网），或设本变量走 <APP_EXTERNAL_URL>/r/<token>（需 nginx 代理 /r/）。
+      # 默认 RustFS 内网部署 / local 后端需设本变量。
       # - APP_EXTERNAL_URL=${APP_EXTERNAL_URL:-}
       # 前端外部 origin，用于邀请链接等绝对 URL（留空走 host-relative）
       - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-}
@@ -208,20 +208,13 @@ services:
       - DORIS_TABLE_PREFIX=${DORIS_TABLE_PREFIX:-}
       - DORIS_COMPAT_MODE=${DORIS_COMPAT_MODE:-}
       # ========== 文件存储 ==========
-      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_TYPE=${STORAGE_TYPE:-s3}
       # 允许用户使用的存储类型白名单（逗号分隔，留空允许全部）
       - STORAGE_ALLOW_LIST=${STORAGE_ALLOW_LIST:-}
       - LOCAL_STORAGE_BASE_DIR=${LOCAL_STORAGE_BASE_DIR:-/data/files}
       # 本地存储路径前缀（legacy 回填用，一般留空）
       - LOCAL_STORAGE_PATH_PREFIX=${LOCAL_STORAGE_PATH_PREFIX:-}
       - AUTO_RECOVER_DIRTY=${AUTO_RECOVER_DIRTY:-true}
-      # ----- MinIO（STORAGE_TYPE=minio）-----
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-minio:9000}
-      - MINIO_ACCESS_KEY_ID=${MINIO_ACCESS_KEY_ID:-minioadmin}
-      - MINIO_SECRET_ACCESS_KEY=${MINIO_SECRET_ACCESS_KEY:-minioadmin}
-      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME:-}
-      - MINIO_PATH_PREFIX=${MINIO_PATH_PREFIX:-}
-      - MINIO_USE_SSL=${MINIO_USE_SSL:-false}
       # ----- 火山引擎 TOS（STORAGE_TYPE=tos）-----
       - TOS_ENDPOINT=${TOS_ENDPOINT:-}
       - TOS_REGION=${TOS_REGION:-}
@@ -231,15 +224,15 @@ services:
       - TOS_PATH_PREFIX=${TOS_PATH_PREFIX:-}
       - TOS_TEMP_BUCKET_NAME=${TOS_TEMP_BUCKET_NAME:-}
       - TOS_TEMP_REGION=${TOS_TEMP_REGION:-}
-      # ----- AWS S3（STORAGE_TYPE=s3）-----
-      - S3_ENDPOINT=${S3_ENDPOINT:-}
-      - S3_REGION=${S3_REGION:-}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
-      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-}
+      # ----- S3 协议（默认连接内置 RustFS）-----
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://rustfs:9000}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-weknora}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-weknora}
       - S3_PATH_PREFIX=${S3_PATH_PREFIX:-weknora/}
-      - S3_USE_SSL=${S3_USE_SSL:-true}
-      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-false}
+      - S3_USE_SSL=${S3_USE_SSL:-false}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
       # ----- 华为云 OBS（STORAGE_TYPE=obs）-----
       - OBS_ENDPOINT=${OBS_ENDPOINT:-}
       - OBS_REGION=${OBS_REGION:-}
@@ -298,7 +291,7 @@ services:
       # 保留原始 URL 的图片域名白名单（逗号分隔，不替换为 provider://）
       - IMAGE_HOST_KEEP_URL=${IMAGE_HOST_KEEP_URL:-}
       # Always allow the optional searxng sidecar, bundled vector stores, and
-      # the default MinIO storage host (compose service names). User-controlled
+      # the default RustFS storage host (compose service names). User-controlled
       # endpoints are SSRF-validated and these private docker-network hosts
       # would otherwise be rejected; whitelisting them keeps the
       # out-of-box experience. Merged on top of SSRF_WHITELIST so user
@@ -307,7 +300,7 @@ services:
       # DB host would skip the 5432 port block.)
       # doris-be: Stream Load follows FE→BE redirects that must receive Basic
       # credentials on whitelisted BE hosts.
-      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-searxng,qdrant,milvus,weaviate,doris-fe,doris-be,minio}
+      - SSRF_WHITELIST_EXTRA=${SSRF_WHITELIST_EXTRA:-searxng,qdrant,milvus,weaviate,doris-fe,doris-be,rustfs}
       - CONCURRENCY_POOL_SIZE=${CONCURRENCY_POOL_SIZE:-5}
       - JWT_SECRET=${JWT_SECRET:-}
       # File size limit (in MB)
@@ -372,6 +365,8 @@ services:
         condition: service_healthy
       docreader:
         condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
     networks:
       - WeKnora-network
     restart: unless-stopped
@@ -596,28 +591,50 @@ services:
       - searxng
       - full
 
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: WeKnora-minio
+  rustfs:
+    image: rustfs/rustfs:${RUSTFS_VERSION:-latest}
+    container_name: WeKnora-rustfs
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${RUSTFS_PORT:-9000}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY_ID:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_ACCESS_KEY:-minioadmin}
-    command: server --console-address ":9001" /data
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY:-weknora}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      - RUSTFS_VOLUMES=/data
+      - RUSTFS_ADDRESS=:9000
+      - RUSTFS_CONSOLE_ADDRESS=:9001
+      - RUSTFS_CONSOLE_ENABLE=true
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - WeKnora-network
-    profiles:
-      - minio
-      - full
+    restart: unless-stopped
+
+  rustfs-init:
+    image: rustfs/rc:${RUSTFS_CLI_VERSION:-latest}
+    container_name: WeKnora-rustfs-init
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        /usr/bin/rc alias set rustfs http://rustfs:9000 "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        /usr/bin/rc bucket create "rustfs/$${S3_BUCKET_NAME}" --ignore-existing
+        /usr/bin/rc bucket create rustfs/langfuse --ignore-existing
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-weknora}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-weknora}
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    networks:
+      - WeKnora-network
+    restart: "no"
 
   neo4j:
     image: neo4j:2025.10.1
@@ -779,7 +796,7 @@ services:
   # 为了最小化资源占用，Langfuse 会复用 WeKnora 已有的 postgres 和 redis：
   #   - postgres：在 WeKnora-postgres 中创建独立的 "langfuse" 数据库
   #   - redis  ：复用 WeKnora-redis 的 DB 1（WeKnora 自己用 DB 0）
-  # 需要新增的只有 Langfuse 应用自身 + ClickHouse（OLAP）+ 专用 MinIO（事件/媒体 S3）。
+  # Langfuse 的事件/媒体对象写入上面的 RustFS（独立 langfuse 桶）。
   #
   # 启用方式：
   #   docker compose --profile langfuse up -d
@@ -850,34 +867,6 @@ services:
       - langfuse
       - full
 
-  langfuse-minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: WeKnora-langfuse-minio
-    restart: unless-stopped
-    entrypoint: sh
-    # 启动前创建 `langfuse` 桶，Langfuse 开箱即用
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-    ports:
-      # 9100：S3 API（浏览器上传媒体时会直连此端口，必须对外暴露）
-      - "${LANGFUSE_MINIO_S3_PORT:-9100}:9000"
-      # 9101：MinIO 控制台（可选，方便排障）
-      - "${LANGFUSE_MINIO_CONSOLE_PORT:-9101}:9001"
-    volumes:
-      - langfuse_minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 10s
-      retries: 5
-    networks:
-      - WeKnora-network
-    profiles:
-      - langfuse
-      - full
-
   langfuse-worker:
     image: langfuse/langfuse-worker:3
     container_name: WeKnora-langfuse-worker
@@ -890,8 +879,8 @@ services:
         condition: service_started
       langfuse-clickhouse:
         condition: service_healthy
-      langfuse-minio:
-        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
     # 用 wrapper entrypoint：在容器启动时把 DB_PASSWORD / REDIS_PASSWORD 做 URL 编码，
     # 避免 DB_PASSWORD 含 '@' / '#' 等字符导致 Prisma 无法解析 DATABASE_URL (P1013)。
     # Langfuse 镜像基于 Node.js，直接用 node 的 encodeURIComponent，不引外部依赖。
@@ -931,17 +920,17 @@ services:
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-weknora}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://rustfs:9000
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-      # 媒体上传用的外部 endpoint（浏览器直连），默认指向宿主机映射的 9100 端口
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://localhost:9100}
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-weknora}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      # 媒体上传用的外部 endpoint（浏览器直连），默认指向宿主机映射的 9000 端口
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://localhost:9000}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
     networks:
@@ -1026,7 +1015,7 @@ volumes:
   postgres-data:
   data-files:
   docreader-tmp:
-  minio_data:
+  rustfs_data:
   neo4j-data:
   qdrant_data:
   milvus_data:
@@ -1037,5 +1026,4 @@ volumes:
   doris_be_log:
   langfuse_clickhouse_data:
   langfuse_clickhouse_logs:
-  langfuse_minio_data:
   searxng_config:

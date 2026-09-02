@@ -1,6 +1,7 @@
 # Server configuration
 server:
-  port: 8080
+  # 本机 127.0.0.1:8080 已被既有的 searxng-cn 容器占用，改用 8081 避开
+  port: 8081
   host: "0.0.0.0"
 
 # Conversation service configuration

@@ -59,7 +59,7 @@ docker compose logs -f app | grep Langfuse
 | PostgreSQL | 复用 `WeKnora-postgres` | 通过一次性的 `langfuse-db-init` 容器，在同一 pg 实例里创建独立的 `langfuse` 数据库。库级隔离，互不影响。 |
 | Redis | 复用 `WeKnora-redis` | 使用独立的 Redis DB 号（默认 DB 1，WeKnora 用 DB 0）。`REDIS_CONNECTION_STRING` 指定 DB 后缀。 |
 | ClickHouse | 新增 `langfuse-clickhouse` | Langfuse 专有（OLAP 事件存储），WeKnora 不用，必须独立。 |
-| MinIO | 新增 `langfuse-minio` | 故意和 WeKnora 的 `minio` 分开（后者是可选 profile，未必激活；Langfuse S3 要专属 bucket）。 |
+| RustFS | 复用 `rustfs` 的 `langfuse` 桶 | Langfuse 仍使用标准 S3 环境变量和 path-style 访问。 |
 | Web / Worker | 新增 `langfuse-web` + `langfuse-worker` | Langfuse 应用本体。 |
 
 最终 `--profile langfuse` 只新增 **4 个常驻容器 + 1 个一次性 init**，内存开销由原先的 ~1.5–2.5 GB 降到约 **1.0–1.5 GB**。
@@ -90,7 +90,7 @@ docker compose up -d app
 > echo "LANGFUSE_NEXTAUTH_SECRET=$(openssl rand -base64 32)"
 > ```
 >
-> 同时把 `LANGFUSE_DB_PASSWORD` / `LANGFUSE_CLICKHOUSE_PASSWORD` / `LANGFUSE_REDIS_PASSWORD` / `LANGFUSE_MINIO_PASSWORD` 全部换成强密码。完整变量清单见 `.env.example` 的 "Langfuse 自建栈配置" 段。
+> 同时把数据库、ClickHouse、Redis 以及 `S3_SECRET_KEY` 全部换成强密码。完整变量清单见 `.env.example`。
 
 ##### 通用调优
 
@@ -104,7 +104,7 @@ docker compose up -d app
 | langfuse-web | 常驻 | 300–500 MB | Next.js |
 | langfuse-worker | 常驻 | 200–400 MB | Node.js，Queue consumer |
 | langfuse-clickhouse | 常驻 | 500 MB–1 GB | 首次迁移稍高，稳态约 500 MB |
-| langfuse-minio | 常驻 | 100–200 MB | |
+| rustfs | 常驻 | 与 WeKnora 共用 | 使用独立 `langfuse` 桶 |
 | （复用）WeKnora-postgres | – | +~50 MB | 多一个 `langfuse` 数据库 |
 | （复用）WeKnora-redis | – | +30–80 MB | 共用实例的 DB 1 |
 | **新增合计** | | **≈ 1.0–1.5 GB** | 推荐 3 GB+ 可用内存 |

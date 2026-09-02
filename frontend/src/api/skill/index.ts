@@ -1,4 +1,4 @@
-import { del, get, post, postUpload } from "../../utils/request";
+import { del, get, getDown, post, postUpload } from "../../utils/request";
 import type { ConfigSkillFileContent, ConfigSkillFileEntry } from "../system";
 
 // Skill信息
@@ -85,4 +85,11 @@ export function getCatalogSkillFile(catalogId: string, path: string) {
   return get<{ data: ConfigSkillFileContent }>(`/api/v1/skills/catalog/${catalogId}/files/content`, {
     params: { path },
   });
+}
+
+// 下载已写入当前 WeKnora API 地址的 OpenClaw Skill 文件夹压缩包。
+// API Key 不会写入文件，仍由 OpenClaw 运行环境通过环境变量提供。
+export function downloadWeKnoraSkill(baseUrl: string): Promise<Blob> {
+  const query = new URLSearchParams({ base_url: baseUrl })
+  return getDown(`/api/v1/skills/weknora/download?${query.toString()}`)
 }

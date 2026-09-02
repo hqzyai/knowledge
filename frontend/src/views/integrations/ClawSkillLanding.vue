@@ -5,16 +5,30 @@
     variant="claw"
   >
     <template #actions>
-      <IntegrationExternalCta
-        variant="claw"
-        :label="$t('integrations.claw.installCta')"
-        :hint="$t('integrations.claw.installCtaHint')"
-        @click="openClawHub"
-      >
-        <template #icon>
-          <span class="ext-cta-emoji" role="img" :aria-label="$t('common.clawhubSkill')">🦞</span>
-        </template>
-      </IntegrationExternalCta>
+      <div class="landing-action-grid">
+        <IntegrationExternalCta
+          variant="claw"
+          trailing-icon="download"
+          :disabled="downloading"
+          :label="$t('integrations.claw.downloadCta')"
+          :hint="$t('integrations.claw.downloadCtaHint')"
+          @click="downloadSkill"
+        >
+          <template #icon>
+            <t-icon name="folder-zip" size="18px" />
+          </template>
+        </IntegrationExternalCta>
+        <IntegrationExternalCta
+          variant="claw"
+          :label="$t('integrations.claw.installCta')"
+          :hint="$t('integrations.claw.installCtaHint')"
+          @click="openClawHub"
+        >
+          <template #icon>
+            <span class="ext-cta-emoji" role="img" :aria-label="$t('common.clawhubSkill')">🦞</span>
+          </template>
+        </IntegrationExternalCta>
+      </div>
     </template>
 
     <template #main>
@@ -71,9 +85,9 @@
                     </t-button>
                   </div>
                 </div>
-                <div v-if="step === 'install'" class="landing-step-embed">
+                <div v-if="step === 'download'" class="landing-step-embed">
                   <div class="code-toolbar">
-                    <pre class="code-toolbar__code">{{ installCommand }}</pre>
+                    <pre class="code-toolbar__code">{{ localInstallCommand }}</pre>
                     <t-button
                       class="code-toolbar__copy"
                       size="small"
@@ -103,21 +117,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref } from 'vue'
+import { MessagePlugin } from 'tdesign-vue-next'
+import { useI18n } from 'vue-i18n'
 import { copyWithToast } from '@/utils/clipboard'
 import { useRouter } from 'vue-router'
+import { downloadWeKnoraSkill } from '@/api/skill'
 import { CLAWHUB_SKILL_URL } from '@/config/integrations'
 import { useApiBaseUrlDisplay } from '@/composables/useApiBaseUrlDisplay'
 import { useUIStore } from '@/stores/ui'
 import IntegrationLandingLayout from './IntegrationLandingLayout.vue'
 import IntegrationExternalCta from './IntegrationExternalCta.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const uiStore = useUIStore()
 const { apiBaseUrlDisplay } = useApiBaseUrlDisplay()
+const downloading = ref(false)
 
 const capabilityKeys = ['upload', 'url', 'manual', 'search', 'browse'] as const
-const stepKeys = ['api', 'env', 'install', 'verify'] as const
+const stepKeys = ['api', 'download', 'env', 'verify'] as const
 
 const capabilityIcons: Record<(typeof capabilityKeys)[number], string> = {
   upload: 'upload',
@@ -127,15 +146,38 @@ const capabilityIcons: Record<(typeof capabilityKeys)[number], string> = {
   browse: 'view-list',
 }
 
-const installCommand = 'openclaw skills install @lyingbug/weknora'
+const localInstallCommand = 'unzip weknora-skill.zip\nopenclaw skills install ./weknora'
 
-const envExample = computed(() => {
-  const base = apiBaseUrlDisplay.value || 'https://your-server.com/api/v1'
-  return `export WEKNORA_BASE_URL="${base}"\nexport WEKNORA_API_KEY="sk-your-api-key"`
-})
+const envExample = 'export WEKNORA_API_KEY="sk-your-api-key"'
 
 const openClawHub = () => {
   window.open(CLAWHUB_SKILL_URL, '_blank', 'noopener,noreferrer')
+}
+
+const downloadSkill = async () => {
+  if (!apiBaseUrlDisplay.value || downloading.value) return
+
+  downloading.value = true
+  try {
+    // BASE_URL can be a reverse-proxy subpath such as /app/weknora.
+    // The downloaded skill runs outside this page, so embed an absolute URL.
+    const baseUrl = new URL(apiBaseUrlDisplay.value, window.location.origin).toString().replace(/\/$/, '')
+    const blob = await downloadWeKnoraSkill(baseUrl)
+    const objectUrl = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = 'weknora-skill.zip'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    MessagePlugin.success(t('integrations.claw.downloadSuccess'))
+  } catch (error) {
+    console.error('[ClawSkillLanding] skill download failed:', error)
+    MessagePlugin.error(t('integrations.claw.downloadFailed'))
+  } finally {
+    downloading.value = false
+  }
 }
 
 const openApiSettings = () => {
@@ -143,6 +185,6 @@ const openApiSettings = () => {
   uiStore.openSettings('integration-api')
 }
 
-const copyEnvExample = () => copyWithToast(envExample.value, 'integrations.claw.copyEnvSuccess')
-const copyInstallCommand = () => copyWithToast(installCommand, 'integrations.claw.copyCmdSuccess')
+const copyEnvExample = () => copyWithToast(envExample, 'integrations.claw.copyEnvSuccess')
+const copyInstallCommand = () => copyWithToast(localInstallCommand, 'integrations.claw.copyCmdSuccess')
 </script>

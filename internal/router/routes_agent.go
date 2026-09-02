@@ -69,9 +69,9 @@ func RegisterUserFavoriteRoutes(r *gin.RouterGroup, h *handler.UserResourceFavor
 
 // RegisterSkillRoutes registers skill routes.
 //
-// PR 2 currently only exposes a read-only `ListSkills`; gated to
-// Viewer+. Future skill upload / enable endpoints must use Admin+ since
-// skills run sandboxed code on tenant resources.
+// Read-only list and download endpoints are gated to Viewer+. Future skill
+// upload / enable endpoints must use Admin+ since skills run sandboxed code on
+// tenant resources.
 func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler, g *rbacGuards) {
 	skills := r.Group("/skills")
 	{
@@ -79,6 +79,8 @@ func RegisterSkillRoutes(r *gin.RouterGroup, skillHandler *handler.SkillHandler,
 		skills.GET("", g.Viewer(), skillHandler.ListSkills)
 		// Catalog reads are Viewer+ so the agent editor can show uninstalled skills.
 		skills.GET("/catalog", g.Viewer(), skillHandler.ListCatalog)
+		// Download the WeKnora integration skill with this instance's API URL embedded — Viewer+
+		skills.GET("/weknora/download", g.Viewer(), skillHandler.DownloadWeKnoraSkill)
 	}
 	// Catalog writes bake into sandbox images; scoped API keys cannot hold them.
 	catalogWrite := g.apiKeyGroup(r.Group("/skills/catalog"), apiKeyFullAccess())

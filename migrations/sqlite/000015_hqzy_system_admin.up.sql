@@ -1,8 +1,6 @@
--- SQLite mirror of PostgreSQL migration 000086_hqzy_system_admin.
-
--- SQLite's consolidated baseline predates platform administrators.
-ALTER TABLE users ADD COLUMN is_system_admin BOOLEAN NOT NULL DEFAULT 0;
-CREATE INDEX IF NOT EXISTS idx_users_is_system_admin ON users(is_system_admin);
+-- SQLite mirror of PostgreSQL migration 000093_hqzy_system_admin.
+-- Schema support for system administrators is provided by migration 000007;
+-- this migration only reserves the HQZY workspace and seeds its owner.
 
 INSERT OR IGNORE INTO tenants (
     id,

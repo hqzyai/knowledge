@@ -6445,15 +6445,15 @@ export default {
       steps: {
         api: {
           title: 'Get API credentials',
-          desc: 'Copy API Key and base URL from Settings → API Info.'
+          desc: 'Create or copy an API Key from Settings → API Info. The current API URL is embedded during download.'
         },
         env: {
-          title: 'Configure environment',
-          desc: 'Set WEKNORA_BASE_URL and WEKNORA_API_KEY in your shell or ~/.zshrc / ~/.bashrc. The example below uses your current API base URL—replace the API Key with your actual value.'
+          title: 'Configure the API Key',
+          desc: 'Set WEKNORA_API_KEY in the OpenClaw runtime. WEKNORA_BASE_URL is normally no longer required.'
         },
-        install: {
-          title: 'Install the skill',
-          desc: 'Run the command below in an environment with the OpenClaw CLI installed, or follow the ClawHub page instructions.'
+        download: {
+          title: 'Download and install the skill',
+          desc: 'Download the ZIP above, extract it, then install the included weknora folder. The skill already contains this API URL.'
         },
         verify: {
           title: 'Verify connection',
@@ -6464,7 +6464,11 @@ export default {
       copy: 'Copy',
       copyEnvSuccess: 'Environment example copied',
       copyCmdSuccess: 'Install command copied',
-      ecosystemNote: 'Skill hosted on ClawHub ({\'@\'}lyingbug/weknora). See the ClawHub page for full API docs and version history.',
+      downloadCta: 'Download skill folder',
+      downloadCtaHint: 'ZIP includes this API URL · only the API Key is required',
+      downloadSuccess: 'WeKnora Skill download started',
+      downloadFailed: 'Could not download the skill. Try again later.',
+      ecosystemNote: 'The direct download is based on ClawHub {\'@\'}lyingbug/weknora and embeds this WeKnora API URL. ClawHub remains available for remote installation and version history.',
       installCta: 'Open ClawHub',
       installCtaHint: 'Install WeKnora Skill · opens in a new tab',
       hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0'

@@ -65,7 +65,7 @@ show_help() {
     echo "  help       显示此帮助信息"
     echo ""
     echo "可选 Profile（用于 start 命令）:"
-    echo "  --minio       启动 MinIO 对象存储"
+    echo "  RustFS 对象存储会随基础设施自动启动，应用通过 S3 协议连接"
     echo "  --qdrant      启动 Qdrant 向量数据库"
     echo "  --neo4j       启动 Neo4j 图数据库"
     echo "  --dex         启动 Dex（OIDC 身份认证）"
@@ -209,15 +209,11 @@ start_services() {
     # 解析 profile 参数
     shift  # 移除 "start" 命令本身
     # 默认启动基础设施（postgres / redis / docreader）+ langfuse，
-    # 其余可选服务通过 --minio / --qdrant / --neo4j / --dex / --full 按需开启。
+    # RustFS 随基础设施启动，其余可选服务通过 --qdrant / --neo4j / --dex / --full 按需开启。
     PROFILES="--profile langfuse"
     ENABLED_SERVICES="langfuse"
     while [ $# -gt 0 ]; do
         case "$1" in
-            --minio)
-                PROFILES="$PROFILES --profile minio"
-                ENABLED_SERVICES="$ENABLED_SERVICES minio"
-                ;;
             --qdrant)
                 PROFILES="$PROFILES --profile qdrant"
                 ENABLED_SERVICES="$ENABLED_SERVICES qdrant"
@@ -245,7 +241,7 @@ start_services() {
                 ;;
             --full)
                 PROFILES="--profile full"
-                ENABLED_SERVICES="minio qdrant neo4j dex"
+                ENABLED_SERVICES="qdrant neo4j dex"
                 break
                 ;;
             *)
@@ -278,9 +274,7 @@ start_services() {
         echo "  - DocReader:     localhost:50051"
         
         # 根据启用的 profile 显示额外服务
-        if [[ "$ENABLED_SERVICES" == *"minio"* ]]; then
-            echo "  - MinIO:         localhost:9000 (Console: localhost:9001)"
-        fi
+        echo "  - RustFS:        localhost:9000 (Console: localhost:9001)"
         if [[ "$ENABLED_SERVICES" == *"qdrant"* ]]; then
             echo "  - Qdrant:        localhost:6333 (gRPC: localhost:6334)"
         fi
@@ -471,7 +465,7 @@ start_app() {
         export DB_HOST="${DB_HOST:-$DEV_REMOTE_HOST}"
         export REDIS_ADDR="${REDIS_ADDR:-$DEV_REMOTE_HOST:6379}"
         export DOCREADER_ADDR="${DOCREADER_ADDR:-$DEV_REMOTE_HOST:50051}"
-        export MINIO_ENDPOINT="${MINIO_ENDPOINT:-$DEV_REMOTE_HOST:9000}"
+        export S3_ENDPOINT="${S3_ENDPOINT:-http://$DEV_REMOTE_HOST:9000}"
         export MILVUS_ADDRESS="${MILVUS_ADDRESS:-$DEV_REMOTE_HOST:19530}"
         export NEO4J_URI="${NEO4J_URI:-bolt://$DEV_REMOTE_HOST:7687}"
         export QDRANT_HOST="${QDRANT_HOST:-$DEV_REMOTE_HOST}"
@@ -481,7 +475,7 @@ start_app() {
     else
         export DB_HOST=127.0.0.1
         export DOCREADER_ADDR=127.0.0.1:50051
-        export MINIO_ENDPOINT=127.0.0.1:9000
+        export S3_ENDPOINT=http://127.0.0.1:9000
         export REDIS_ADDR=127.0.0.1:6379
         export MILVUS_ADDRESS=127.0.0.1:19530
         export NEO4J_URI=bolt://127.0.0.1:7687

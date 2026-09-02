@@ -147,7 +147,7 @@ Feishu、Notion、Yuqueなどの外部プラットフォームからのナレッ
 | 大規模モデル | OpenAI / Azure OpenAI / Anthropic (Claude) / DeepSeek / Qwen (Alibaba Cloud) / Zhipu / Hunyuan / Doubao (Volcengine) / Gemini / MiniMax / NVIDIA / Novita AI / SiliconFlow / OpenRouter / Requesty / Ollama |
 | Embedding | Ollama / BGE / GTE / OpenAI 互換 API |
 | ベクトル DB | PostgreSQL (pgvector) / Elasticsearch / OpenSearch / Milvus / Weaviate / Qdrant / Apache Doris / Tencent VectorDB |
-| オブジェクトストレージ | ローカル / MinIO / AWS S3（IAM Role / IRSA のデフォルト資格情報チェーン対応）/ 火山引擎 TOS / Alibaba Cloud OSS / 金山雲 KS3 / 華為雲 OBS；**ワークスペースごとに複数のストレージインスタンス**、KB 単位のバインドとデフォルトインスタンス |
+| オブジェクトストレージ | RustFS（S3 経由）/ ローカル / AWS S3（IAM Role / IRSA のデフォルト資格情報チェーン対応）/ 火山引擎 TOS / Alibaba Cloud OSS / 金山雲 KS3 / 華為雲 OBS；**ワークスペースごとに複数のストレージインスタンス**、KB 単位のバインドとデフォルトインスタンス |
 | IM 統合 | WeChat Work / Feishu / Lark（Feishu 国際版）/ QQBot / Slack / Telegram / DingTalk / Mattermost / WeChat / Yunzhijia |
 | ウェブ埋め込み | 埋め込み Widget でエージェントを公開、ドメイン許可リスト・レート制限・セキュアモード Token 交換 |
 | Web 検索 | DuckDuckGo / Bing / Google / Tavily / Baidu / Ollama / SearXNG / Keenable / Zhipu AI |
@@ -225,13 +225,12 @@ docker compose up -d    # 新しいイメージでコンテナを再作成
 
 | Profile | 説明 | コマンド |
 |---------|------|---------|
-| _(デフォルト)_ | コアサービス | `docker compose pull && docker compose up -d` |
+| _(デフォルト)_ | コアサービス（S3 経由の RustFS オブジェクトストレージを含む） | `docker compose pull && docker compose up -d` |
 | `full` | 全機能 | `docker compose --profile full pull && docker compose --profile full up -d` |
 | `neo4j` | ナレッジグラフ (Neo4j) | `docker compose --profile neo4j pull && docker compose --profile neo4j up -d` |
-| `minio` | オブジェクトストレージ (MinIO) | `docker compose --profile minio pull && docker compose --profile minio up -d` |
 | `langfuse` | トレーシング (Langfuse) | `docker compose --profile langfuse pull && docker compose --profile langfuse up -d` |
 
-組み合わせ例：`docker compose --profile neo4j --profile minio pull && docker compose --profile neo4j --profile minio up -d`
+例：`docker compose --profile neo4j pull && docker compose --profile neo4j up -d`
 
 サービス停止：`docker compose down`
 

@@ -552,7 +552,10 @@ definitions:
       parser_engine_rules:
         description: |-
           ParserEngineRules configures which parser engine to use for each file type.
-          When empty, the builtin engine is used for all types.
+          When empty, DefaultParserEngine is used (builtin/simple routing, except
+          types that only a specific engine can parse: ppt/pptx fall back to
+          markitdown). A linked anydoc binding is preferred for every type it
+          converts.
         items:
           $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ParserEngineRule'
         type: array
@@ -662,6 +665,49 @@ definitions:
       summarize_threshold:
         description: 'Summarize threshold: number of messages before summarization'
         type: integer
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncRequest:
+    properties:
+      conversation_at:
+        type: string
+      event_id:
+        type: string
+      text:
+        type: string
+      title:
+        type: string
+      user_id:
+        type: string
+    required:
+    - text
+    - title
+    - user_id
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncResult'
+      success:
+        type: boolean
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ConversationSyncResult:
+    properties:
+      content_version:
+        type: integer
+      document_created:
+        type: boolean
+      document_date:
+        type: string
+      idempotent_replay:
+        type: boolean
+      knowledge_base_created:
+        type: boolean
+      knowledge_base_id:
+        type: string
+      knowledge_id:
+        type: string
+      parse_status:
+        type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.CreateOrganizationRequest:
     properties:
@@ -871,12 +917,17 @@ definitions:
         description: Timeout for a single LLM call in seconds (0 = use global default)
         type: integer
       max_completion_tokens:
-        description: Maximum completion tokens (only for normal mode)
+        description: |-
+          Maximum completion tokens. Quick-answer uses this for the RAG answer.
+          Smart-reasoning ReAct rounds send this value as-is (zero becomes
+          DefaultMaxCompletionTokens at call time: 4096, or 24576 with a sandbox).
         type: integer
       max_iterations:
         description: |-
           ===== Agent Mode Settings =====
-          Maximum ReAct iterations. -1 is unlimited; 0 is unset (default applied).
+          Maximum iterations for the ReAct loop. Zero is unset (filled with a
+          default). A negative value is unlimited: the loop runs until the model
+          stops, the user cancels, or another guard fires.
         type: integer
       mcp_auth_wait_timeout:
         description: |-
@@ -1186,6 +1237,68 @@ definitions:
         type: boolean
       truncate_prompt_tokens:
         type: integer
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 32
+        minLength: 8
+        type: string
+      user_id:
+        maxLength: 128
+        type: string
+      username:
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - email
+    - password
+    - user_id
+    - username
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResult'
+      success:
+        type: boolean
+    type: object
+  github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResult:
+    properties:
+      api_key:
+        type: string
+      api_key_created:
+        type: boolean
+      api_key_id:
+        type: integer
+      capabilities:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      external_user_id:
+        type: string
+      full_access:
+        type: boolean
+      knowledge_base_ids:
+        items:
+          type: string
+        type: array
+      role:
+        $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.TenantRole'
+      space_id:
+        type: integer
+      user_created:
+        type: boolean
+      user_id:
+        type: string
+      username:
+        type: string
     type: object
   github_com_Tencent_WeKnora_internal_types.ExtractConfig:
     properties:
@@ -1687,6 +1800,12 @@ definitions:
           enforcement lives at the GORM layer (`<-:create`) plus the service-layer
           KB update path, which omits this field from its update DTO.
         type: string
+      visibility:
+        allOf:
+        - $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.KnowledgeBaseVisibility'
+        description: |-
+          Visibility governs access by members of this same workspace. It does not
+          grant access to other workspaces and does not replace organization shares.
       vlm_config:
         allOf:
         - $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.VLMConfig'
@@ -1765,6 +1884,14 @@ definitions:
       source_tenant_id:
         type: integer
     type: object
+  github_com_Tencent_WeKnora_internal_types.KnowledgeBaseVisibility:
+    enum:
+    - personal
+    - workspace
+    type: string
+    x-enum-varnames:
+    - KnowledgeBaseVisibilityPersonal
+    - KnowledgeBaseVisibilityWorkspace
   github_com_Tencent_WeKnora_internal_types.KnowledgeMoveProgress:
     properties:
       created_at:
@@ -2418,6 +2545,16 @@ definitions:
         type: string
       base_url:
         type: string
+      context_window:
+        description: |-
+          ContextWindow is the model's total context window in tokens and
+          MaxOutputTokens the most it emits in one response. Both are provider
+          facts the agent cannot discover but has to act on: the context window is
+          what decides when conversation history gets compacted, and assuming a
+          window larger than the real one means compaction never fires and the
+          provider rejects the request mid-conversation instead. 0 means unknown,
+          which falls back to DefaultMaxContextTokens.
+        type: integer
       custom_headers:
         additionalProperties:
           type: string
@@ -2443,6 +2580,8 @@ definitions:
           across all replicas. 0 (the default) means "fall back to the
           process-wide model.max_concurrency". Interactive user-facing calls are
           never gated. Only chat / vlm / embedding honour this (see limiter.Gate).
+        type: integer
+      max_output_tokens:
         type: integer
       parameter_size:
         description: Ollama model parameter size (e.g., "7B", "13B", "70B")
@@ -2483,6 +2622,7 @@ definitions:
       ModelSourceGemini: Gemini model
       ModelSourceHunyuan: Hunyuan model
       ModelSourceJina: Jina AI model
+      ModelSourceLiteLLM: LiteLLM proxy model
       ModelSourceLocal: Local model
       ModelSourceMimo: Mimo model
       ModelSourceMinimax: Minimax mode
@@ -2490,7 +2630,6 @@ definitions:
       ModelSourceNvidia: NVIDIA model
       ModelSourceOpenAI: OpenAI model
       ModelSourceOpenRouter: OpenRouter model
-      ModelSourceLiteLLM: LiteLLM proxy model
       ModelSourceRemote: Remote model
       ModelSourceRequesty: Requesty model
       ModelSourceSiliconFlow: SiliconFlow model
@@ -7505,6 +7644,35 @@ paths:
       summary: 删除生成的问题
       tags:
       - 分块管理
+  /conversation-sync:
+    post:
+      consumes:
+      - application/json
+      description: 按外部用户创建私有知识库，用最新对话快照覆盖当天 Markdown 文档，并异步重建分片、向量、问题与 Wiki
+      parameters:
+      - description: 对话同步内容
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: 已持久化并提交后台处理
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ConversationSyncResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: 同步用户每日对话
+      tags:
+      - 知识管理
   /datasource:
     get:
       description: List all data sources for a specific knowledge base
@@ -7969,6 +8137,48 @@ paths:
       summary: 执行评估
       tags:
       - 评估
+  /external-users:
+    post:
+      consumes:
+      - application/json
+      description: 在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的 API Key；该 Key 可读取自身白名单知识库及同空间公开知识库，相同
+        user_id 重试会返回同一用户和凭证
+      parameters:
+      - description: 外部用户资料
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 幂等重试成功
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse'
+        "201":
+          description: 用户或 API Key 已创建
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.ExternalUserCreateResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "403":
+          description: 必须使用 10000 空间的 Owner JWT 或 Full Access API Key
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "409":
+          description: 外部用户标识与已有账号冲突
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: 创建外部系统用户
+      tags:
+      - 空间管理
   /faq/import/progress/{task_id}:
     get:
       consumes:
@@ -14228,6 +14438,50 @@ paths:
       summary: Retry a skill install
       tags:
       - SandboxConfig
+  /sandbox-configs/{id}/skills/{skillId}/stop:
+    post:
+      description: Abort an in-flight install so the operator can retry or uninstall.
+        After a process restart the row may still say installing with no live process;
+        this rewrites it immediately instead of waiting for the stuck-run reaper.
+        Removal is not stopped.
+      parameters:
+      - description: Sandbox config ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Skill ID
+        in: path
+        name: skillId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Stopped skill
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Skill is not installing
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Skill not found
+          schema:
+            $ref: '#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError'
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: Stop a skill install
+      tags:
+      - SandboxConfig
   /sandbox-configs/{id}/skills/{skillId}/transcript:
     get:
       description: |-
@@ -14852,6 +15106,157 @@ paths:
       - Bearer: []
       - ApiKeyAuth: []
       summary: 获取当前沙箱配置上可执行的 Skills
+      tags:
+      - Skills
+  /skills/catalog:
+    get:
+      description: Returns every skill definition in this workspace and which sandbox
+        configs it is installed on.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: List workspace skills
+      tags:
+      - Skills
+    post:
+      consumes:
+      - application/json
+      - multipart/form-data
+      description: Records a skill without installing it. Send a zip as multipart
+        field "file", or JSON {"source":"..."}.
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Add a skill to the workspace catalog
+      tags:
+      - Skills
+  /skills/catalog/{id}:
+    delete:
+      description: Refused while any sandbox still has an installation of this skill.
+      parameters:
+      - description: Catalog skill ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a catalog skill
+      tags:
+      - Skills
+  /skills/catalog/{id}/files:
+    get:
+      description: Lists the stored catalog bundle. Files belong to the skill definition,
+        not a sandbox install.
+      parameters:
+      - description: Catalog skill ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List files of a catalog skill
+      tags:
+      - Skills
+  /skills/catalog/{id}/files/content:
+    get:
+      parameters:
+      - description: Catalog skill ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Skill-root-relative file path
+        in: query
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Read one file of a catalog skill
+      tags:
+      - Skills
+  /skills/catalog/{id}/install:
+    post:
+      consumes:
+      - application/json
+      description: Runs the existing snapshot install onto each named sandbox config.
+      parameters:
+      - description: Catalog skill ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Install a catalog skill onto sandboxes
+      tags:
+      - Skills
+  /skills/weknora/download:
+    get:
+      description: 下载一个已写入 API Base URL、仅需通过环境变量提供 API Key 的 WeKnora Skill ZIP
+      parameters:
+      - description: 写入 Skill 的 API Base URL（必须以 /api/v1 结尾）
+        in: query
+        name: base_url
+        type: string
+      produces:
+      - application/zip
+      responses:
+        "200":
+          description: weknora-skill.zip
+          schema:
+            type: file
+        "400":
+          description: API Base URL 无效
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: 生成 ZIP 失败
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      - ApiKeyAuth: []
+      summary: 下载 WeKnora Skill
       tags:
       - Skills
   /storage-backends:

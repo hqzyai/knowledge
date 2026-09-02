@@ -81,28 +81,50 @@ services:
       - searxng
       - full
 
-  minio:
-    image: minio/minio:latest
-    container_name: WeKnora-minio-dev
+  rustfs:
+    image: rustfs/rustfs:${RUSTFS_VERSION:-latest}
+    container_name: WeKnora-rustfs-dev
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${RUSTFS_PORT:-9000}:9000"
+      - "${RUSTFS_CONSOLE_PORT:-9001}:9001"
     environment:
-      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY_ID:-minioadmin}
-      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_ACCESS_KEY:-minioadmin}
-    command: server --console-address ":9001" /data
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY:-weknora}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      - RUSTFS_VOLUMES=/data
+      - RUSTFS_ADDRESS=:9000
+      - RUSTFS_CONSOLE_ADDRESS=:9001
+      - RUSTFS_CONSOLE_ENABLE=true
     volumes:
-      - minio_data_dev:/data
+      - rustfs_data_dev:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - WeKnora-network-dev
-    profiles:
-      - minio
-      - full
+    restart: unless-stopped
+
+  rustfs-init:
+    image: rustfs/rc:${RUSTFS_CLI_VERSION:-latest}
+    container_name: WeKnora-rustfs-init-dev
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        /usr/bin/rc alias set rustfs http://rustfs:9000 "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"
+        /usr/bin/rc bucket create "rustfs/$${S3_BUCKET_NAME}" --ignore-existing
+        /usr/bin/rc bucket create rustfs/langfuse --ignore-existing
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-weknora}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-weknora}
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    networks:
+      - WeKnora-network-dev
+    restart: "no"
 
   qdrant:
     image: qdrant/qdrant:v1.16.2
@@ -377,7 +399,7 @@ services:
   #   export LANGFUSE_SECRET_KEY=sk-lf-xxx
   #
   # 复用 dev 已有的 postgres（独立 langfuse 数据库）和 redis（DB 1），
-  # 新增：clickhouse、minio、web、worker + 一次性 db-init，和生产版结构一致。
+  # 新增：clickhouse、web、worker + 一次性 db-init；对象存储复用 RustFS。
   # ---------------------------------------------------------------------------
   # 复用 dev 已有的 ParadeDB 镜像，不额外拉 postgres 镜像
   langfuse-db-init:
@@ -436,31 +458,6 @@ services:
       - langfuse
       - full
 
-  langfuse-minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: WeKnora-langfuse-minio-dev
-    restart: unless-stopped
-    entrypoint: sh
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-    ports:
-      - "${LANGFUSE_MINIO_S3_PORT:-9100}:9000"
-      - "${LANGFUSE_MINIO_CONSOLE_PORT:-9101}:9001"
-    volumes:
-      - langfuse_minio_data_dev:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 10s
-      retries: 5
-    networks:
-      - WeKnora-network-dev
-    profiles:
-      - langfuse
-      - full
-
   langfuse-worker:
     image: langfuse/langfuse-worker:3
     container_name: WeKnora-langfuse-worker-dev
@@ -472,8 +469,8 @@ services:
         condition: service_started
       langfuse-clickhouse:
         condition: service_healthy
-      langfuse-minio:
-        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
     # wrapper entrypoint 把 DB_PASSWORD / REDIS_PASSWORD URL 编码后再拼 URL，
     # 避免密码含 '@' / '#' 等字符导致 Prisma P1013 解析失败。
     # 注意：compose 覆盖 entrypoint 会清空镜像默认 CMD，所以末尾写死原始命令。
@@ -509,16 +506,16 @@ services:
       CLICKHOUSE_CLUSTER_ENABLED: "false"
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
-      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-weknora}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://rustfs:9000
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
       LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
-      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${LANGFUSE_MINIO_USER:-langfuseminio}
-      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-langfuseminiosecret}
-      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://localhost:9100}
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-weknora}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-weknora-rustfs-change-me}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: ${LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT:-http://localhost:9000}
       LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
       LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
     networks:
@@ -575,7 +572,7 @@ networks:
 volumes:
   postgres-data-dev:
   redis_data_dev:
-  minio_data_dev:
+  rustfs_data_dev:
   neo4j-data-dev:
   qdrant_data_dev:
   opensearch_data_dev:
@@ -583,5 +580,4 @@ volumes:
   docreader-tmp-dev:
   langfuse_clickhouse_data_dev:
   langfuse_clickhouse_logs_dev:
-  langfuse_minio_data_dev:
   searxng_config_dev:

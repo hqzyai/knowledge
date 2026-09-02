@@ -1,4 +1,4 @@
--- Migration: 000086_hqzy_system_admin
+-- Migration: 000093_hqzy_system_admin
 -- Description: Reserve workspace 10000 for AgentOS/WeKnora integration and
 -- seed the built-in HQZY platform administrator.
 --

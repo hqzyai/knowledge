@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -281,7 +282,7 @@ func (s *userService) ProvisionExternalUser(
 	if safe, ok := secutils.ValidateInput(email); !ok || safe != email {
 		return nil, false, errors.New("email contains invalid characters")
 	}
-	if err := ValidatePasswordPolicy(req.Password); err != nil {
+	if err := ValidatePasswordPolicy(req.Password, s.complexPasswordEnabled(ctx)); err != nil {
 		return nil, false, err
 	}
 

@@ -301,8 +301,8 @@ clean-db:
 	@if [ $$(docker volume ls -q -f name=weknora_postgres-data) ]; then \
 		docker volume rm weknora_postgres-data; \
 	fi
-	@if [ $$(docker volume ls -q -f name=weknora_minio_data) ]; then \
-		docker volume rm weknora_minio_data; \
+	@if [ $$(docker volume ls -q -f name=weknora_rustfs_data) ]; then \
+		docker volume rm weknora_rustfs_data; \
 	fi
 	@if [ $$(docker volume ls -q -f name=weknora_redis_data) ]; then \
 		docker volume rm weknora_redis_data; \
@@ -346,5 +346,4 @@ dev-app:
 
 dev-frontend:
 	./scripts/dev.sh frontend
-
 

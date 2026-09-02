@@ -85,10 +85,6 @@ echo ""
 log_info "存储配置:"
 check_var "STORAGE_TYPE"
 
-if [ "$STORAGE_TYPE" = "minio" ]; then
-    check_var "MINIO_BUCKET_NAME"
-fi
-
 if [ "$STORAGE_TYPE" = "tos" ]; then
     check_var "TOS_ENDPOINT"
     check_var "TOS_REGION"
