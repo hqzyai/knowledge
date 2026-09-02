@@ -30,7 +30,7 @@ func TestCreateExternalUser(t *testing.T) {
 			"data": map[string]interface{}{
 				"external_user_id": "hermes-42", "user_id": "internal-42",
 				"username": "hermes_42", "email": "h42@example.com",
-				"space_id": 10001, "role": "contributor", "api_key_id": 91,
+				"space_id": 10000, "role": "contributor", "api_key_id": 91,
 				"api_key": "sk-user", "full_access": false,
 				"capabilities":       []string{"chat", "retrieve", "read_agents"},
 				"knowledge_base_ids": []string{"kb-user"},
@@ -47,7 +47,7 @@ func TestCreateExternalUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.SpaceID != 10001 || result.Role != "contributor" || result.FullAccess || result.APIKey != "sk-user" ||
+	if result.SpaceID != 10000 || result.Role != "contributor" || result.FullAccess || result.APIKey != "sk-user" ||
 		len(result.Capabilities) != 3 || len(result.KnowledgeBaseIDs) != 1 {
 		t.Fatalf("result = %+v", result)
 	}

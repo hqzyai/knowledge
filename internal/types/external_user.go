@@ -9,7 +9,7 @@ import (
 
 // ExternalUserDefaultTenantID is the fixed workspace that receives users
 // provisioned by trusted external systems.
-const ExternalUserDefaultTenantID uint64 = 10001
+const ExternalUserDefaultTenantID uint64 = 10000
 
 // ExternalUserAPIKeyNamePrefix reserves a deterministic API-key namespace for
 // one conversation credential per provisioned external user. The internal

@@ -111,7 +111,7 @@ func TestCreateExternalUserReturnsStableConversationKey(t *testing.T) {
 	status, first := call()
 	require.Equal(t, http.StatusCreated, status)
 	require.True(t, first.Success)
-	require.Equal(t, uint64(10001), first.Data.SpaceID)
+	require.Equal(t, uint64(10000), first.Data.SpaceID)
 	require.Equal(t, types.TenantRoleContributor, first.Data.Role)
 	require.Equal(t, "sk-external-user", first.Data.APIKey)
 	require.False(t, first.Data.FullAccess)

@@ -115,7 +115,7 @@ type tenantAPIKeyCreateResponse struct {
 	Data    CreatedTenantAPIKey `json:"data"`
 }
 
-// ExternalUserCreateRequest provisions a Hermes user in workspace 10001.
+// ExternalUserCreateRequest provisions a Hermes user in workspace 10000.
 // UserID must be the same stable external ID used by SyncConversation.
 type ExternalUserCreateRequest struct {
 	UserID   string `json:"user_id"`
@@ -158,7 +158,7 @@ func (c *Client) CreateTenant(ctx context.Context, tenant *Tenant) (*Tenant, err
 }
 
 // CreateExternalUser creates or resumes an externally managed user in
-// workspace 10001 and returns the user's scoped conversation API key.
+// workspace 10000 and returns the user's scoped conversation API key.
 func (c *Client) CreateExternalUser(
 	ctx context.Context, req *ExternalUserCreateRequest,
 ) (*ExternalUserCreateResult, error) {

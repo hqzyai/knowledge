@@ -717,7 +717,7 @@ func (h *TenantHandler) CreateAPIKey(c *gin.Context) {
 
 // CreateExternalUser godoc
 // @Summary      创建外部系统用户
-// @Description  在固定的 10001 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证
+// @Description  在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证
 // @Tags         空间管理
 // @Accept       json
 // @Produce      json
@@ -725,7 +725,7 @@ func (h *TenantHandler) CreateAPIKey(c *gin.Context) {
 // @Success      200      {object}  types.ExternalUserCreateResponse "幂等重试成功"
 // @Success      201      {object}  types.ExternalUserCreateResponse "用户或 API Key 已创建"
 // @Failure      400      {object}  errors.AppError                  "请求参数错误"
-// @Failure      403      {object}  errors.AppError                  "必须使用 10001 空间的 Owner JWT 或 Full Access API Key"
+// @Failure      403      {object}  errors.AppError                  "必须使用 10000 空间的 Owner JWT 或 Full Access API Key"
 // @Failure      409      {object}  errors.AppError                  "外部用户标识与已有账号冲突"
 // @Security     Bearer
 // @Security     ApiKeyAuth
@@ -734,7 +734,7 @@ func (h *TenantHandler) CreateExternalUser(c *gin.Context) {
 	ctx := c.Request.Context()
 	tenantID, ok := types.TenantIDFromContext(ctx)
 	if !ok || tenantID != types.ExternalUserDefaultTenantID {
-		c.Error(errors.NewForbiddenError("External users can only be provisioned from workspace 10001"))
+		c.Error(errors.NewForbiddenError("External users can only be provisioned from workspace 10000"))
 		return
 	}
 	if h.service == nil || h.userService == nil || h.memberService == nil || h.apiKeyService == nil {
@@ -754,7 +754,7 @@ func (h *TenantHandler) CreateExternalUser(c *gin.Context) {
 		case stderrors.Is(err, service.ErrExternalUserIdentityConflict):
 			c.Error(errors.NewConflictError("user_id, username or email conflicts with an existing account"))
 		case stderrors.Is(err, service.ErrExternalUserTenantUnavailable):
-			c.Error(errors.NewServiceUnavailableError("Workspace 10001 is unavailable"))
+			c.Error(errors.NewServiceUnavailableError("Workspace 10000 is unavailable"))
 		case stderrors.Is(err, service.ErrPasswordPolicy):
 			c.Error(errors.NewValidationError("Password must be 8-32 characters and contain letters and numbers"))
 		default:

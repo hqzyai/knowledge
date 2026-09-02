@@ -2621,7 +2621,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "在固定的 10001 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证",
+                "description": "在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证",
                 "consumes": [
                     "application/json"
                 ],
@@ -2663,7 +2663,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "必须使用 10001 空间的 Owner JWT 或 Full Access API Key",
+                        "description": "必须使用 10000 空间的 Owner JWT 或 Full Access API Key",
                         "schema": {
                             "$ref": "#/definitions/github_com_Tencent_WeKnora_internal_errors.AppError"
                         }
