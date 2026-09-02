@@ -71,15 +71,21 @@ func (s *sessionService) resolveKnowledgeBases(
 		kbIDs = s.resolveKnowledgeBasesFromAgent(ctx, customAgent, req.Session.TenantID)
 	}
 
-	if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, requestedKBIDs, req.KnowledgeIDs); err != nil {
-		return nil, nil, err
-	}
-	if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, req.TagScopes); err != nil {
-		return nil, nil, err
-	}
-	kbIDs, err = types.FilterKnowledgeBasesForTenantAPIKeyScope(ctx, requestedKBIDs, kbIDs)
-	if err != nil {
-		return nil, nil, err
+	// External-user keys dynamically inherit read access to workspace-visible
+	// KBs. Their resolved KB objects are validated in buildSearchTargets, where
+	// visibility and tenant ownership are both known. Other keys retain the
+	// existing eager hard-allow-list checks.
+	if !types.TenantAPIKeyAllowsWorkspaceVisibleRead(ctx) {
+		if err := types.AuthorizeTenantAPIKeyKnowledgeTargets(ctx, requestedKBIDs, req.KnowledgeIDs); err != nil {
+			return nil, nil, err
+		}
+		if err := types.AuthorizeTenantAPIKeyTagScopes(ctx, req.TagScopes); err != nil {
+			return nil, nil, err
+		}
+		kbIDs, err = types.FilterKnowledgeBasesForTenantAPIKeyScope(ctx, requestedKBIDs, kbIDs)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	return kbIDs, knowledgeIDs, nil
 }

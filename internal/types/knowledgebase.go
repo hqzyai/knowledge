@@ -909,11 +909,15 @@ func CanReadKnowledgeBaseInWorkspace(ctx context.Context, kb *KnowledgeBase) boo
 		return false
 	}
 	// Machine credentials retain their existing allow-list semantics. The API
-	// key middleware has already verified capabilities; a restricted key may
-	// read only listed KBs, while an unrestricted administrative key may read
-	// the workspace as before.
+	// key middleware has already verified capabilities. External-user keys may
+	// additionally receive an explicit, read-only grant for workspace-visible
+	// KBs; writes remain bounded by the stable allow-list.
 	if scope, ok := TenantAPIKeyScopeFromContext(ctx); ok {
-		return scope.AllowsKnowledgeBase(kb.ID)
+		if scope.AllowsKnowledgeBase(kb.ID) {
+			return true
+		}
+		return scope.AllowsWorkspaceVisibleRead() &&
+			kb.EffectiveVisibility() == KnowledgeBaseVisibilityWorkspace
 	}
 	if TenantRoleFromContext(ctx).HasPermission(TenantRoleAdmin) {
 		return true

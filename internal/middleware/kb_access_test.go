@@ -163,6 +163,7 @@ type guardOpts struct {
 	agentShare          *stubAgentShareForGuard // nil means "no agent-share service"
 	userID              string
 	tenantRole          types.TenantRole
+	apiKeyScope         *types.TenantAPIKeyScope
 }
 
 // runGuard fires a single request through the guard and returns the
@@ -202,6 +203,9 @@ func runGuard(
 	}
 	if opts.tenantRole != "" {
 		ctx = context.WithValue(ctx, types.TenantRoleContextKey, opts.tenantRole)
+	}
+	if opts.apiKeyScope != nil {
+		ctx = types.WithTenantAPIKeyScope(ctx, *opts.apiKeyScope)
 	}
 	c.Request = req.WithContext(ctx)
 
@@ -269,6 +273,36 @@ func TestRequireKBAccess_WorkspaceVisibilityGrantsReadOnly(t *testing.T) {
 	access, ok := KBAccessFromContext(c)
 	require.True(t, ok)
 	require.Equal(t, types.OrgRoleViewer, access.Permission)
+}
+
+func TestRequireKBAccess_ExternalUserKeyWorkspaceVisibleReadOnly(t *testing.T) {
+	scope := &types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"kb-own"},
+		IncludeWorkspaceVisibleRead: true,
+	}
+	workspace := &types.KnowledgeBase{
+		ID: "kb-open", TenantID: 100, CreatorID: "admin",
+		Visibility: types.KnowledgeBaseVisibilityWorkspace,
+	}
+	personal := &types.KnowledgeBase{
+		ID: "kb-private", TenantID: 100, CreatorID: "admin",
+		Visibility: types.KnowledgeBaseVisibilityPersonal,
+	}
+
+	_, readable := runGuard(t, 100, workspace.ID, types.OrgRoleViewer, workspace, nil, guardOpts{
+		userID: "external", tenantRole: types.TenantRoleViewer, apiKeyScope: scope,
+	})
+	require.False(t, readable.IsAborted(), "external-user key should read workspace-visible KBs")
+
+	_, privateDenied := runGuard(t, 100, personal.ID, types.OrgRoleViewer, personal, nil, guardOpts{
+		userID: "external", tenantRole: types.TenantRoleViewer, apiKeyScope: scope,
+	})
+	require.True(t, privateDenied.IsAborted(), "dynamic grant must not expose another user's personal KB")
+
+	_, writeDenied := runGuard(t, 100, workspace.ID, types.OrgRoleEditor, workspace, nil, guardOpts{
+		userID: "external", tenantRole: types.TenantRoleViewer, apiKeyScope: scope,
+	})
+	require.True(t, writeDenied.IsAborted(), "workspace visibility is read-only for external-user keys")
 }
 
 func TestRequireKBAccess_OwnKB(t *testing.T) {
@@ -559,6 +593,36 @@ func TestRequireKBAccess_Forbidden_FailOpenWhenRBACDisabled(t *testing.T) {
 	guard(c)
 	require.False(t, c.IsAborted(), "guard must pass through when EnableRBAC is off")
 	_ = rec
+}
+
+func TestRequireKBAccess_ExternalUserKeyScopeNeverFailsOpenWhenRBACDisabled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: "kb-private"}}
+	req := httptest.NewRequest("GET", "/", nil)
+	ctx := context.WithValue(req.Context(), types.TenantIDContextKey, uint64(100))
+	ctx = context.WithValue(ctx, types.UserIDContextKey, "external")
+	ctx = types.WithTenantAPIKeyScope(ctx, types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"kb-own"},
+		IncludeWorkspaceVisibleRead: true,
+	})
+	c.Request = req.WithContext(ctx)
+
+	guard := RequireKBAccess(
+		KBIDFromParam("id"),
+		types.OrgRoleViewer,
+		&stubKBLookup{kbs: map[string]*types.KnowledgeBase{
+			"kb-private": {
+				ID: "kb-private", TenantID: 100, CreatorID: "admin",
+				Visibility: types.KnowledgeBaseVisibilityPersonal,
+			},
+		}},
+		nil, nil,
+		cfgRBAC(false),
+	)
+	guard(c)
+	require.True(t, c.IsAborted(), "API-key KB scope must remain enforced when RBAC is observe-only")
 }
 
 func TestRequireKBAccess_NotFound_FiresEvenWhenRBACDisabled(t *testing.T) {

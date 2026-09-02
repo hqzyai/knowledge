@@ -55,3 +55,28 @@ func TestResolveKnowledgeBasesRejectsExplicitOutOfScopeKBForRestrictedAPIKey(t *
 		t.Fatal("expected forbidden for explicit out-of-scope knowledge_base_ids")
 	}
 }
+
+func TestResolveKnowledgeBasesDefersWorkspaceVisibleReadValidation(t *testing.T) {
+	ctx := types.WithTenantAPIKeyScope(context.Background(), types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"kb-own"},
+		IncludeWorkspaceVisibleRead: true,
+	})
+	svc := &sessionService{}
+
+	kbIDs, _, err := svc.resolveKnowledgeBases(ctx, &types.QARequest{
+		Session: &types.Session{TenantID: 10000},
+		CustomAgent: &types.CustomAgent{
+			TenantID: 10000,
+			Config: types.CustomAgentConfig{
+				KBSelectionMode: "selected",
+				KnowledgeBases:  []string{"kb-workspace-open"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolveKnowledgeBases returned error: %v", err)
+	}
+	if len(kbIDs) != 1 || kbIDs[0] != "kb-workspace-open" {
+		t.Fatalf("kbIDs = %#v, want deferred workspace-visible candidate", kbIDs)
+	}
+}

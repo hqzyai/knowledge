@@ -143,7 +143,7 @@ kb, err := apiClient.GetKnowledgeBase(ctx, kbID)
 | `CreateManualKnowledge` | 创建手写（manual）知识 |
 | `UpdateManualKnowledge` | 更新手写知识 |
 | `SyncConversation` | 按外部用户/自然日追加对话，并触发重分片、向量、问题、Wiki 与图谱处理 |
-| `CreateExternalUser` | 在 10001 空间创建外部用户并返回问答/检索/智能体读取能力 API Key |
+| `CreateExternalUser` | 在 10000 空间创建外部用户并返回问答/检索/智能体读取能力 API Key |
 | `FilterKnowledge` | 按关键词/文件类型/agent 过滤知识 |
 | `MoveKnowledge` | 跨知识库迁移知识 |
 | `GetKnowledgeMoveProgress` | 查询迁移任务进度 |

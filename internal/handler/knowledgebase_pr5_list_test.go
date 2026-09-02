@@ -218,6 +218,73 @@ func TestListKB_FiltersPersonalRowsForOrdinaryWorkspaceMember(t *testing.T) {
 	require.ElementsMatch(t, []string{"mine", "workspace-open"}, ids)
 }
 
+func TestListKB_ExternalUserKeyAddsWorkspaceVisibleToStableAllowList(t *testing.T) {
+	kbs := []*types.KnowledgeBase{
+		{ID: "own", TenantID: 1, CreatorID: "external", Visibility: types.KnowledgeBaseVisibilityPersonal},
+		{ID: "private-other", TenantID: 1, CreatorID: "admin", Visibility: types.KnowledgeBaseVisibilityPersonal},
+		{ID: "workspace-open", TenantID: 1, CreatorID: "admin", Visibility: types.KnowledgeBaseVisibilityWorkspace},
+	}
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(middleware.ErrorHandler())
+	r.Use(func(c *gin.Context) {
+		c.Set(types.TenantIDContextKey.String(), uint64(1))
+		c.Set(types.UserIDContextKey.String(), "external")
+		ctx := context.WithValue(c.Request.Context(), types.TenantIDContextKey, uint64(1))
+		ctx = context.WithValue(ctx, types.UserIDContextKey, "external")
+		ctx = types.WithTenantAPIKeyScope(ctx, types.TenantAPIKeyScope{
+			KnowledgeBaseIDs:            types.StringArray{"own"},
+			IncludeWorkspaceVisibleRead: true,
+		})
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	r.GET("/knowledge-bases", (&KnowledgeBaseHandler{service: &stubListKBService{kbs: kbs}}).ListKnowledgeBases)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/knowledge-bases", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	var envelope struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &envelope))
+	ids := make([]string, 0, len(envelope.Data))
+	for _, row := range envelope.Data {
+		ids = append(ids, row.ID)
+	}
+	require.ElementsMatch(t, []string{"own", "workspace-open"}, ids)
+}
+
+func TestValidateAndGetKnowledgeBase_ReusesDynamicReadGuardAccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Params = gin.Params{{Key: "id", Value: "workspace-open"}}
+	c.Set(types.TenantIDContextKey.String(), uint64(1))
+	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(1))
+	ctx = types.WithTenantAPIKeyScope(ctx, types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"own"},
+		IncludeWorkspaceVisibleRead: true,
+	})
+	c.Request = httptest.NewRequest(http.MethodGet, "/knowledge-bases/workspace-open", nil).WithContext(ctx)
+	kb := &types.KnowledgeBase{
+		ID: "workspace-open", TenantID: 1, CreatorID: "admin",
+		Visibility: types.KnowledgeBaseVisibilityWorkspace,
+	}
+	c.Set(middleware.KBAccessContextKey, &middleware.KBAccess{
+		KnowledgeBase: kb, EffectiveTenantID: 1, Permission: types.OrgRoleViewer,
+	})
+
+	got, id, tenantID, permission, err := (&KnowledgeBaseHandler{}).validateAndGetKnowledgeBase(c)
+	require.NoError(t, err)
+	require.Same(t, kb, got)
+	require.Equal(t, "workspace-open", id)
+	require.Equal(t, uint64(1), tenantID)
+	require.Equal(t, types.OrgRoleViewer, permission)
+}
+
 func TestListKB_BatchesStoreLookupsToAvoidNPlus1(t *testing.T) {
 	// Five KBs bound to three distinct stores. The list endpoint must
 	// resolve them in a single BatchResolveStoreView call regardless of

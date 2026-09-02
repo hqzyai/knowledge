@@ -125,7 +125,7 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
 
 ### POST /api/v1/external-users
 
-用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10000`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，并将知识库白名单预绑定到该用户可能创建的 Hermes 对话知识库 ID。
+用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10000`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，知识库权限为“预绑定的个人 Hermes 对话知识库 + 同空间 `visibility=workspace` 的公开知识库（动态只读）”。
 
 权限：空间 `10000` 的 Owner JWT，或该空间已有的 Full Access API Key。接口不会接受其它空间的凭证。
 
@@ -165,7 +165,7 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
 }
 ```
 
-注意：用户登录后的“编辑”权限默认进入“我创建的知识库”，并只能编辑自己创建的知识库。返回的 API Key 不能管理空间、成员、模型或知识库生命周期；问答与检索还会受到 `knowledge_base_ids` 白名单限制。`/conversation-sync` 是例外：它只要求 API Key 有效，不检查 capability 或知识库白名单。
+注意：用户登录后的“编辑”权限默认进入“我创建的知识库”，并只能编辑自己创建的知识库。返回的 API Key 不能管理空间、成员、模型或知识库生命周期；`knowledge_base_ids` 仍是可写边界及稳定的个人知识库白名单，同空间公开知识库只在读取、检索和问答时动态加入。公开库改回 `personal` 后会立即失去访问权限，不需要刷新或重发 API Key。`/conversation-sync` 是例外：它只要求 API Key 有效，不检查 capability 或知识库白名单。
 
 ```bash
 curl -X POST "$BASE/api/v1/external-users" \

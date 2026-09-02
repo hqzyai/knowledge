@@ -15,6 +15,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/errors"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -448,6 +449,18 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(c *gin.Context) (*typ
 		logger.Error(ctx, "Knowledge base ID is empty")
 		return nil, "", 0, "", apperrors.NewBadRequestError("Knowledge base ID cannot be empty")
 	}
+
+	// KB-scoped routes resolve and authorize the KB before entering the
+	// handler. Reuse that result instead of applying the API key's stable
+	// allow-list a second time: external-user keys may have received a dynamic
+	// read-only grant for a workspace-visible KB in KBAccessRead. Mutating
+	// routes still use KBAccessWrite, which never grants that exception.
+	if access, ok := middleware.KBAccessFromContext(c); ok && access != nil {
+		if access.KnowledgeBase == nil || access.KnowledgeBase.ID != id {
+			return nil, id, 0, "", apperrors.NewForbiddenError("Knowledge base access context mismatch")
+		}
+		return access.KnowledgeBase, id, access.EffectiveTenantID, access.Permission, nil
+	}
 	if err := requireTenantAPIKeyKnowledgeBase(ctx, id); err != nil {
 		return nil, id, 0, "", err
 	}
@@ -763,7 +776,8 @@ func filterKnowledgeBasesForAPIKeyScope(ctx context.Context, kbs []*types.Knowle
 	}
 	filtered := make([]*types.KnowledgeBase, 0, len(kbs))
 	for _, kb := range kbs {
-		if kb != nil && scope.AllowsKnowledgeBase(kb.ID) {
+		if kb != nil && (scope.AllowsKnowledgeBase(kb.ID) ||
+			types.CanReadKnowledgeBaseInWorkspace(ctx, kb)) {
 			filtered = append(filtered, kb)
 		}
 	}
@@ -776,9 +790,6 @@ func filterKnowledgeBasesForAPIKeyScope(ctx context.Context, kbs []*types.Knowle
 func filterKnowledgeBasesForWorkspaceVisibility(
 	ctx context.Context, kbs []*types.KnowledgeBase,
 ) []*types.KnowledgeBase {
-	if _, isAPIKey := types.TenantAPIKeyScopeFromContext(ctx); isAPIKey {
-		return kbs
-	}
 	tenantID, _ := types.TenantIDFromContext(ctx)
 	filtered := make([]*types.KnowledgeBase, 0, len(kbs))
 	for _, kb := range kbs {

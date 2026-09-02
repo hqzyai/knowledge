@@ -547,14 +547,22 @@ func attachAPIKeyAuthContext(
 	}
 	if key != nil {
 		session.APIKeyScope = &types.TenantAPIKeyScope{
-			KeyID:            key.ID,
-			ScopeType:        key.ScopeType,
-			FullAccess:       fullAccess,
-			KnowledgeBaseIDs: key.KnowledgeBaseIDs,
-			Capabilities:     key.Capabilities,
+			KeyID:                       key.ID,
+			ScopeType:                   key.ScopeType,
+			FullAccess:                  fullAccess,
+			KnowledgeBaseIDs:            key.KnowledgeBaseIDs,
+			Capabilities:                key.Capabilities,
+			IncludeWorkspaceVisibleRead: externalUserKeyIncludesWorkspaceVisibleRead(key),
 		}
 	}
 	applyAuthSession(c, session)
+}
+
+func externalUserKeyIncludesWorkspaceVisibleRead(key *types.TenantAPIKey) bool {
+	if key == nil || key.IsPlatform() || key.FullAccess {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(key.Name), types.ExternalUserAPIKeyNamePrefix)
 }
 
 func resolveAPIPrincipal(ctx context.Context, tenant *types.Tenant, header http.Header) (types.Principal, error) {

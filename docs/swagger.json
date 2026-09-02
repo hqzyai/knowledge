@@ -2614,7 +2614,7 @@
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的个人知识库 API Key；相同 user_id 重试会返回同一用户和凭证",
+                "description": "在固定的 10000 空间创建编辑角色用户，并返回仅允许问答、检索和读取智能体的 API Key；该 Key 可读取自身白名单知识库及同空间公开知识库，相同 user_id 重试会返回同一用户和凭证",
                 "consumes": [
                     "application/json"
                 ],

@@ -216,6 +216,39 @@ func TestBuildSearchTargets_RejectsPersonalKBViaKnowledgeID(t *testing.T) {
 	assert.Contains(t, err.Error(), "No permission")
 }
 
+func TestBuildSearchTargets_ExternalUserKeyAllowsOnlyWorkspaceVisibleBeyondAllowList(t *testing.T) {
+	svc := newTagTargetSessionService()
+	kb := svc.knowledgeBaseService.(*tagTargetKnowledgeBaseService).kbs["doc-kb"]
+	kb.CreatorID = "admin"
+	kb.Visibility = types.KnowledgeBaseVisibilityWorkspace
+	ctx := types.WithTenantAPIKeyScope(tagTargetContext(), types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"kb-own"},
+		IncludeWorkspaceVisibleRead: true,
+	})
+
+	targets, err := svc.buildSearchTargets(ctx, 100, []string{"doc-kb"}, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	assert.Equal(t, "doc-kb", targets[0].KnowledgeBaseID)
+
+	kb.Visibility = types.KnowledgeBaseVisibilityPersonal
+	_, err = svc.buildSearchTargets(ctx, 100, []string{"doc-kb"}, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "API key scope")
+}
+
+func TestBuildSearchTargets_ExternalUserKeyFailsClosedWhenKBMetadataIsMissing(t *testing.T) {
+	svc := newTagTargetSessionService()
+	ctx := types.WithTenantAPIKeyScope(tagTargetContext(), types.TenantAPIKeyScope{
+		KnowledgeBaseIDs:            types.StringArray{"kb-own"},
+		IncludeWorkspaceVisibleRead: true,
+	})
+
+	_, err := svc.buildSearchTargets(ctx, 100, []string{"kb-missing"}, nil, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot verify")
+}
+
 func TestBuildSearchTargets_SharedAgentScopeRemainsIndependent(t *testing.T) {
 	svc := newTagTargetSessionService()
 	kb := svc.knowledgeBaseService.(*tagTargetKnowledgeBaseService).kbs["doc-kb"]
