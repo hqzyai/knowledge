@@ -49,7 +49,8 @@ type CreateKnowledgeQARequest struct {
 	AgentID               string                       `json:"agent_id"`                              // Selected custom agent ID (backend resolves shared agent and its workspace from share relation)
 	AgentSourceTenantID   uint64                       `json:"agent_source_tenant_id,omitempty"`      // Optional disambiguator; backend still verifies the share relation
 	WebSearchEnabled      bool                         `json:"web_search_enabled"`                    // Whether web search is enabled for this request
-	SummaryModelID        string                       `json:"summary_model_id"`                      // Optional summary model ID for this request (overrides session default)
+	SummaryModelID        string                       `json:"summary_model_id"`                      // Optional persisted summary model ID for this request
+	ChatModel             *types.RequestChatModel      `json:"chat_model,omitempty"`                  // Ephemeral OpenAI-compatible model for machine callers
 	MCPServiceIDs         []string                     `json:"mcp_service_ids"`                       // Per-request MCP services selected via @mention
 	SkillNames            []string                     `json:"skill_names"`                           // Per-request Skills selected via @mention
 	TagIDs                []string                     `json:"tag_ids"`                               // @mentioned tag IDs (display/debug; scoped via MentionedItems)

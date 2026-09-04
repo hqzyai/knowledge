@@ -48,6 +48,7 @@ type qaRequestContext struct {
 	mcpServiceIDs         []string
 	skillNames            []string
 	summaryModelID        string
+	requestChatModel      *types.RequestChatModel
 	webSearchEnabled      bool
 	mentionedItems        types.MentionedItems
 	effectiveTenantID     uint64                   // when using shared agent, tenant ID for model/KB/MCP resolution; 0 = use context tenant
@@ -80,6 +81,7 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		Query:               rc.query,
 		AssistantMessageID:  rc.assistantMessage.ID,
 		SummaryModelID:      rc.summaryModelID,
+		RequestChatModel:    rc.requestChatModel,
 		CustomAgent:         rc.customAgent,
 		SharedAgentReadOnly: rc.sharedAgentReadOnly,
 		KnowledgeBaseIDs:    rc.knowledgeBaseIDs,
@@ -93,6 +95,31 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		WebSearchEnabled:    rc.webSearchEnabled,
 		Attachments:         rc.attachments,
 	}
+}
+
+func validateRequestChatModel(ctx context.Context, model *types.RequestChatModel) error {
+	if model == nil {
+		return nil
+	}
+
+	scope, ok := types.TenantAPIKeyScopeFromContext(ctx)
+	if !ok || (!scope.FullAccess && !scope.HasCapability(types.APIKeyCapabilityChat)) {
+		return errors.NewForbiddenError("chat_model is available only to API keys authorized for chat")
+	}
+
+	normalized := model.Normalize()
+	if normalized.BaseURL == "" || normalized.APIKey == "" || normalized.ModelName == "" {
+		return errors.NewBadRequestError("chat_model requires base_url, api_key, and model_name")
+	}
+	if len(normalized.BaseURL) > 2048 || len(normalized.APIKey) > 16384 || len(normalized.ModelName) > 512 {
+		return errors.NewBadRequestError("chat_model contains a value that exceeds its size limit")
+	}
+	if err := secutils.ValidateURLForSSRF(normalized.BaseURL); err != nil {
+		return errors.NewBadRequestError(secutils.FormatSSRFError("chat_model.base_url", normalized.BaseURL, err))
+	}
+
+	*model = normalized
+	return nil
 }
 
 // parseQARequest parses and validates a QA request, returns the request context
@@ -121,6 +148,9 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	if request.Query == "" {
 		logger.Error(ctx, "Query content is empty")
 		return nil, nil, errors.NewBadRequestError("Query content cannot be empty")
+	}
+	if err := validateRequestChatModel(ctx, request.ChatModel); err != nil {
+		return nil, nil, err
 	}
 
 	// Resolve the storage-reference representation up front: once the SSE stream
@@ -383,6 +413,7 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		mcpServiceIDs:         secutils.SanitizeForLogArray(mcpServiceIDs),
 		skillNames:            secutils.SanitizeForLogArray(skillNames),
 		summaryModelID:        secutils.SanitizeForLog(request.SummaryModelID),
+		requestChatModel:      request.ChatModel,
 		webSearchEnabled:      request.WebSearchEnabled,
 		mentionedItems:        convertMentionedItems(request.MentionedItems),
 		effectiveTenantID:     effectiveTenantID,
@@ -646,6 +677,7 @@ func (h *Handler) setupSSEStream(reqCtx *qaRequestContext, generateTitle bool) *
 	// borrowed tenant above drives everything else, because DeleteSession tears
 	// that sandbox down from a request that only knows the session's tenant.
 	baseCtx = types.WithSandboxTenantID(baseCtx, reqCtx.session.TenantID)
+	baseCtx = types.WithRequestChatModel(baseCtx, reqCtx.requestChatModel)
 
 	// An agent that opted out of long-term memory has to be opted out of the
 	// write path too, not just recall. The two run from different contexts:
@@ -691,7 +723,9 @@ func (h *Handler) setupSSEStream(reqCtx *qaRequestContext, generateTitle bool) *
 	if generateTitle && reqCtx.session.Title == "" {
 		// Use the same model as the conversation for title generation
 		modelID := ""
-		if reqCtx.customAgent != nil && reqCtx.customAgent.Config.ModelID != "" {
+		if reqCtx.requestChatModel != nil {
+			modelID = types.RequestChatModelID
+		} else if reqCtx.customAgent != nil && reqCtx.customAgent.Config.ModelID != "" {
 			modelID = reqCtx.customAgent.Config.ModelID
 		}
 		logger.Infof(reqCtx.ctx, "Session has no title, starting async title generation, session ID: %s, model: %s", reqCtx.sessionID, modelID)

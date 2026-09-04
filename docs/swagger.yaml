@@ -3042,6 +3042,15 @@ definitions:
       user:
         $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.User'
     type: object
+  github_com_Tencent_WeKnora_internal_types.RequestChatModel:
+    properties:
+      api_key:
+        type: string
+      base_url:
+        type: string
+      model_name:
+        type: string
+    type: object
   github_com_Tencent_WeKnora_internal_types.RequestRoleUpgradeRequest:
     properties:
       message:
@@ -6286,6 +6295,10 @@ definitions:
       channel:
         description: 'Source channel: "web", "api", "im", etc.'
         type: string
+      chat_model:
+        allOf:
+        - $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.RequestChatModel'
+        description: Ephemeral OpenAI-compatible model for machine callers
       disable_title:
         description: Whether to disable auto title generation
         type: boolean
@@ -6325,8 +6338,7 @@ definitions:
       suggestion_attribution:
         $ref: '#/definitions/github_com_Tencent_WeKnora_internal_types.SuggestionAttribution'
       summary_model_id:
-        description: Optional summary model ID for this request (overrides session
-          default)
+        description: Optional persisted summary model ID for this request
         type: string
       tag_ids:
         description: '@mentioned tag IDs (display/debug; scoped via MentionedItems)'

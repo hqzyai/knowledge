@@ -213,6 +213,25 @@ func TestCloneContextPreservesTenantAPIKeyScope(t *testing.T) {
 	}
 }
 
+func TestCloneContextPreservesRequestChatModel(t *testing.T) {
+	t.Parallel()
+
+	want := &types.RequestChatModel{
+		BaseURL:   "http://ai-gateway:4000/v1",
+		APIKey:    "agentos-key",
+		ModelName: "current-model",
+	}
+	cloned := CloneContext(types.WithRequestChatModel(context.Background(), want))
+
+	got, ok := types.RequestChatModelFromContext(cloned)
+	if !ok {
+		t.Fatal("RequestChatModelFromContext(cloned) = false, want true")
+	}
+	if got.BaseURL != want.BaseURL || got.APIKey != want.APIKey || got.ModelName != want.ModelName {
+		t.Fatalf("cloned request model = %#v, want %#v", got, *want)
+	}
+}
+
 // setupSSEStream builds its async context through CloneContext, so dropping
 // this key here would silently re-key every session→sandbox binding onto the
 // tenant a shared agent borrowed — stranding the MicroVM at session deletion.

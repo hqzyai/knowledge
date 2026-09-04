@@ -42,7 +42,7 @@ services:
       S3_PATH_PREFIX: ${S3_PATH_PREFIX:-weknora/}
       S3_USE_SSL: ${S3_USE_SSL:-false}
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
-      SSRF_WHITELIST_EXTRA: rustfs
+      SSRF_WHITELIST_EXTRA: rustfs,ai-gateway,host.docker.internal
 
       # Docker sandbox 依赖宿主机 Docker CLI 和文件系统路径映射，直接放在
       # app 容器内运行并不安全可靠。需要沙箱时可显式设置

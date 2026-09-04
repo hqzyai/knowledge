@@ -41,6 +41,12 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// hand background work broader reach than the key it came from.
 	TenantAPIKeyScopeContextKey: true,
 
+	// A request-scoped chat model is supplied by a machine caller for this one
+	// QA turn. The handler deliberately detaches the SSE worker from the HTTP
+	// request before any model call, so the endpoint and credential must cross
+	// that detach with the rest of the turn and expire when its context does.
+	RequestChatModelContextKey: true,
+
 	// Session scope. SessionTenantID re-scopes session/message lookups, while
 	// SandboxTenantID keys the session→sandbox binding to the session owner
 	// even when a shared agent borrowed another tenant. Dropping the latter

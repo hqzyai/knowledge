@@ -26,6 +26,7 @@ func (s *sessionService) KnowledgeQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	ctx = types.WithRequestChatModel(ctx, req.RequestChatModel)
 	ctx = withSharedAgentKBVisibilityScope(ctx, req)
 	logger.Infof(
 		ctx,
@@ -154,6 +155,11 @@ func (s *sessionService) KnowledgeQA(
 	// Apply custom agent overrides (system prompt, temperature, retrieval params,
 	// rewrite, fallback, FAQ strategy, history turns)
 	s.applyAgentOverridesToChatManage(ctx, req.CustomAgent, chatManage)
+	if req.RequestChatModel != nil {
+		// A machine-supplied model owns every text-generation stage in this
+		// turn; do not fall back to the agent's persisted rewrite model.
+		chatManage.QueryUnderstandModelID = ""
+	}
 
 	// An agent may opt out of long-term memory. The preference is per-request
 	// rather than per-user, so it travels in the context that the recall

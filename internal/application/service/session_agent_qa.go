@@ -22,6 +22,7 @@ func (s *sessionService) AgentQA(
 	req *types.QARequest,
 	eventBus *event.EventBus,
 ) error {
+	ctx = types.WithRequestChatModel(ctx, req.RequestChatModel)
 	ctx = withSharedAgentKBVisibilityScope(ctx, req)
 	sessionID := req.Session.ID
 	// Propagate the session ID so stateful sandbox backends (CubeSandbox) can

@@ -155,6 +155,30 @@ func (s *modelService) CreateModel(ctx context.Context, model *types.Model) erro
 	return nil
 }
 
+func requestChatModelEntity(ctx context.Context, id string) (*types.Model, bool, error) {
+	if id != types.RequestChatModelID {
+		return nil, false, nil
+	}
+	config, ok := types.RequestChatModelFromContext(ctx)
+	if !ok {
+		return nil, true, errors.New("request-scoped chat model is missing from context")
+	}
+	tenantID, _ := types.TenantIDFromContext(ctx)
+	return &types.Model{
+		ID:       types.RequestChatModelID,
+		TenantID: tenantID,
+		Name:     config.ModelName,
+		Type:     types.ModelTypeKnowledgeQA,
+		Source:   types.ModelSourceRemote,
+		Status:   types.ModelStatusActive,
+		Parameters: types.ModelParameters{
+			BaseURL:  config.BaseURL,
+			APIKey:   config.APIKey,
+			Provider: string(provider.ProviderLiteLLM),
+		},
+	}, true, nil
+}
+
 // GetModelByID retrieves a model by its ID
 // Returns an error if the model is not found or is in a non-active state
 func (s *modelService) GetModelByID(ctx context.Context, id string) (*types.Model, error) {
@@ -162,6 +186,9 @@ func (s *modelService) GetModelByID(ctx context.Context, id string) (*types.Mode
 	if id == "" {
 		logger.Error(ctx, "Model ID is empty")
 		return nil, errors.New("model ID cannot be empty")
+	}
+	if model, handled, err := requestChatModelEntity(ctx, id); handled {
+		return model, err
 	}
 
 	tenantID := types.MustTenantIDFromContext(ctx)
@@ -593,6 +620,12 @@ func (s *modelService) GetChatModel(ctx context.Context, modelId string) (chat.C
 	if modelId == "" {
 		logger.Error(ctx, "Model ID is empty")
 		return nil, errors.New("model ID cannot be empty")
+	}
+	if model, handled, err := requestChatModelEntity(ctx, modelId); handled {
+		if err != nil {
+			return nil, err
+		}
+		return chat.NewChat(chat.ConfigFromModel(model, "", ""), s.ollamaService)
 	}
 
 	tenantID := types.MustTenantIDFromContext(ctx)

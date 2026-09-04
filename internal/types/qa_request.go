@@ -7,7 +7,8 @@ type QARequest struct {
 	Session             *Session           // The conversation session
 	Query               string             // User query text
 	AssistantMessageID  string             // Pre-created assistant message ID
-	SummaryModelID      string             // Optional model override; empty = use agent/KB default
+	SummaryModelID      string             // Optional persisted model override; empty = use agent/KB default
+	RequestChatModel    *RequestChatModel  // Ephemeral OpenAI-compatible model supplied by an API-key caller
 	CustomAgent         *CustomAgent       // Optional custom agent for config override
 	SharedAgentReadOnly bool               // True only when access came from an agent share; source-workspace writes are forbidden
 	KnowledgeBaseIDs    []string           // Knowledge base IDs to search (from request + @mentions)

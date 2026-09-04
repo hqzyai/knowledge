@@ -131,6 +131,11 @@ func (s *sessionService) resolveChatModelID(
 	knowledgeBaseIDs []string,
 	knowledgeIDs []string,
 ) (string, error) {
+	if req.RequestChatModel != nil {
+		logger.Infof(ctx, "Using request-scoped chat model: %q", req.RequestChatModel.ModelName)
+		return types.RequestChatModelID, nil
+	}
+
 	summaryModelID := req.SummaryModelID
 	customAgent := req.CustomAgent
 	session := req.Session

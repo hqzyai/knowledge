@@ -20,6 +20,9 @@ const (
 	PrincipalContextKey ContextKey = "Principal"
 	// TenantAPIKeyScopeContextKey carries per-API-key operation and KB scopes.
 	TenantAPIKeyScopeContextKey ContextKey = "TenantAPIKeyScope"
+	// RequestChatModelContextKey carries an ephemeral OpenAI-compatible model
+	// configuration for a single machine-authenticated QA request.
+	RequestChatModelContextKey ContextKey = "RequestChatModel"
 	// TenantRoleContextKey is the context key for the caller's TenantRole
 	// in the currently active tenant (loaded by the auth middleware from
 	// the tenant_members table). See TenantRoleFromContext.

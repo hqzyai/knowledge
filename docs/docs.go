@@ -21073,6 +21073,20 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Tencent_WeKnora_internal_types.RequestChatModel": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "type": "string"
+                },
+                "base_url": {
+                    "type": "string"
+                },
+                "model_name": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_Tencent_WeKnora_internal_types.RequestRoleUpgradeRequest": {
             "type": "object",
             "required": [
@@ -25422,6 +25436,14 @@ const docTemplate = `{
                     "description": "Source channel: \"web\", \"api\", \"im\", etc.",
                     "type": "string"
                 },
+                "chat_model": {
+                    "description": "Ephemeral OpenAI-compatible model for machine callers",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_Tencent_WeKnora_internal_types.RequestChatModel"
+                        }
+                    ]
+                },
                 "disable_title": {
                     "description": "Whether to disable auto title generation",
                     "type": "boolean"
@@ -25476,7 +25498,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/github_com_Tencent_WeKnora_internal_types.SuggestionAttribution"
                 },
                 "summary_model_id": {
-                    "description": "Optional summary model ID for this request (overrides session default)",
+                    "description": "Optional persisted summary model ID for this request",
                     "type": "string"
                 },
                 "tag_ids": {

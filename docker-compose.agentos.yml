@@ -1,0 +1,19 @@
+# Optional AgentOS integration overlay.
+#
+# Use this file when AgentOS and WeKnora run as separate Compose projects but
+# WeKnora should call the current AgentOS model endpoint (for example,
+# http://ai-gateway:4000/v1) without publishing that endpoint externally:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.agentos.yml up -d
+#
+# Start AgentOS first so its external network exists. Override
+# AGENTOS_COMPOSE_NETWORK when AgentOS uses a non-default network name.
+services:
+  app:
+    networks:
+      - agentos-network
+
+networks:
+  agentos-network:
+    external: true
+    name: ${AGENTOS_COMPOSE_NETWORK:-agentos-network}

@@ -9,6 +9,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestResolveChatModelIDUsesRequestScopedModelWithoutPersistedAgentModel(t *testing.T) {
+	svc := &sessionService{}
+	req := &types.QARequest{
+		Session: &types.Session{},
+		CustomAgent: &types.CustomAgent{
+			ID: "agent-1",
+		},
+		RequestChatModel: &types.RequestChatModel{
+			BaseURL:   "https://models.example.com/v1",
+			APIKey:    "secret",
+			ModelName: "current-agentos-model",
+		},
+	}
+
+	modelID, err := svc.resolveChatModelID(context.Background(), req, nil, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, types.RequestChatModelID, modelID)
+}
+
 func TestResolveChatModelIDRequiresConfiguredAgentModel(t *testing.T) {
 	svc := &sessionService{
 		modelService: &stubModelService{
