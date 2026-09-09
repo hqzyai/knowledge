@@ -87,6 +87,19 @@ func (r *fakeTenantAPIKeyRepo) CreateAPIKey(_ context.Context, key *types.Tenant
 	return nil
 }
 
+func (r *fakeTenantAPIKeyRepo) SetAPIKeyToken(
+	_ context.Context, id uint64, expectedHash, token, hash string,
+) (bool, error) {
+	key, ok := r.byHash[expectedHash]
+	if !ok || key.ID != id || key.RevokedAt != nil {
+		return false, nil
+	}
+	delete(r.byHash, expectedHash)
+	key.APIKey, key.KeyHash = token, hash
+	r.byHash[hash] = key
+	return true, nil
+}
+
 func (r *fakeTenantAPIKeyRepo) GetAPIKeyByHash(_ context.Context, hash string) (*types.TenantAPIKey, error) {
 	key, ok := r.byHash[hash]
 	if !ok {

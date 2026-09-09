@@ -7,7 +7,7 @@ WeKnora 的权限分两层：**空间内**的四级角色（见[租户、用户�
 | | 空间 Owner | 系统管理员 |
 | --- | --- | --- |
 | 作用范围 | 单个工作空间 | 整个部署 |
-| 怎么获得 | 注册即成为自己空间的 Owner，或被转让 | 由现有系统管理员提升，首个靠环境变量引导 |
+| 怎么获得 | 创建空间时成为 Owner，或被转让 | HQZY 初始化预置，或由现有系统管理员提升 |
 | 管什么 | 空间成员、模型、知识库、集成、空间审计 | 全局系统设置、任务队列、平台 API Key、跨空间审计、重置用户密码 |
 | 是否自动叠加 | — | **不会**：在某空间是 Owner 不代表是系统管理员，反之亦然 |
 
@@ -20,7 +20,26 @@ WeKnora 的权限分两层：**空间内**的四级角色（见[租户、用户�
 
 ## 1. 第一个系统管理员怎么来
 
-新部署里**没有任何系统管理员**。引导流程在 `cmd/server/bootstrap.go`：
+当前 HQZY 初始化迁移会创建管理员 `hqzy@admin.com`（用户名 `hqzy_admin`），默认属于空间 `10000`（`HQZY System Workspace`），并授予该空间 Owner、系统管理员和跨空间访问标志。
+
+迁移 `000094`（SQLite 为 `000016`）还会为该空间预置一把 **`HQZY Admin Full Access`** API Key。应用启动时从环境变量 **`WEKNORA_BOOTSTRAP_ADMIN_API_KEY`** 读取固定值，通过现有存储逻辑保存；配置 `SYSTEM_AES_KEY` 时加密存储。它的作用域为 `tenant`、`full_access=true`，默认不过期，可用于调用 `/api/v1/external-users`。
+
+服务端和外部调用服务使用同一个配置值。例如，下方为说明用占位值，部署时替换为双方约定的密钥：
+
+```dotenv
+# WeKnora 服务的 .env
+WEKNORA_BOOTSTRAP_ADMIN_API_KEY=sk-replace-with-your-shared-secret-at-least-32-chars
+# 外部服务的配置（变量名按调用方实现调整）
+WEKNORA_API_KEY=sk-replace-with-your-shared-secret-at-least-32-chars
+```
+
+外部服务将该值原样放入 `X-API-Key` 请求头。Key 必须以 `sk-` 开头，总长 32–256 字符，只允许字母、数字、`-` 和 `_`。此配置留空时跳过初始化，不会随机生成；之后补上配置并重启即可完成初始化。标准 Compose 已透传该变量，本地部署的 `env_file` 读取 `.env`，云部署读取 `.env.cloud`；Helm 可设置 `secrets.bootstrapAdminApiKey`，或在现有 Secret 中添加 `WEKNORA_BOOTSTRAP_ADMIN_API_KEY`。
+
+相同配置重复启动保持原 Key；修改配置并重启会更新这条 Key，原值立即失效，因此调用方也要同步配置。先前版本已生成随机 Key 的部署也会更新为这里的固定值。手动撤销后的 Key 不会自动恢复。
+
+管理员登录并切换到空间 `10000` 后，也可在「API 集成 → API Keys」中复制这把 Key，或通过 Owner JWT 调用 `GET /api/v1/tenants/10000/api-keys` 获取。初始化不会将密钥写入源码或启动日志。新安装和已有数据库升级均支持；若关闭了 `AUTO_MIGRATE`，需先执行相应数据库迁移，再启动应用。
+
+对于没有系统管理员的部署，仍可使用 `cmd/server/bootstrap.go` 的环境变量引导流程：
 
 1. 先用正常流程注册一个账号；
 2. 给 app 服务设 `WEKNORA_BOOTSTRAP_SYSTEM_ADMIN_EMAIL=<该账号邮箱>`，重启；

@@ -31,6 +31,53 @@ func NewTenantAPIKeyService(repo interfaces.TenantAPIKeyRepository) interfaces.T
 	return &tenantAPIKeyService{repo: repo}
 }
 
+func (s *tenantAPIKeyService) InitializeHQZYAdminAPIKey(ctx context.Context, token string) (bool, error) {
+	if token == "" {
+		return false, nil
+	}
+	if len(token) < 32 || len(token) > 256 || !strings.HasPrefix(token, "sk-") ||
+		strings.ContainsFunc(token, func(r rune) bool {
+			return !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_')
+		}) {
+		return false, errors.New("administrator API key must start with sk- and contain 32-256 URL-safe characters")
+	}
+	key, err := s.repo.GetAPIKeyByHash(ctx, types.HQZYAdminAPIKeyPendingHash)
+	if errors.Is(err, apprepo.ErrTenantAPIKeyNotFound) {
+		// Also adopt the operator-provided token when upgrading from the earlier
+		// random-token bootstrap. Listing excludes revoked credentials, so an
+		// explicit revocation is never undone by a restart.
+		keys, listErr := s.repo.ListAPIKeys(ctx, types.ExternalUserDefaultTenantID)
+		if listErr != nil {
+			return false, listErr
+		}
+		for _, candidate := range keys {
+			if candidate != nil && candidate.Name == types.HQZYAdminAPIKeyName {
+				key = candidate
+				break
+			}
+		}
+		if key == nil {
+			return false, nil
+		}
+		err = nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if key.RevokedAt != nil {
+		return false, nil
+	}
+	if key.IsPlatform() || key.TenantIDValue() != types.ExternalUserDefaultTenantID ||
+		!key.FullAccess || key.ExpiresAt != nil {
+		return false, errors.New("invalid HQZY administrator API key seed")
+	}
+	hash := hashTenantAPIKey(token)
+	if key.KeyHash == hash {
+		return false, nil
+	}
+	return s.repo.SetAPIKeyToken(ctx, key.ID, key.KeyHash, token, hash)
+}
+
 func (s *tenantAPIKeyService) CreateAPIKey(
 	ctx context.Context, req interfaces.TenantAPIKeyCreateRequest,
 ) (*interfaces.TenantAPIKeyCreateResult, error) {

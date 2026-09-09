@@ -91,6 +91,9 @@ type TenantAPIKeyUpdateRequest struct {
 
 type TenantAPIKeyRepository interface {
 	CreateAPIKey(ctx context.Context, key *types.TenantAPIKey) error
+	// SetAPIKeyToken atomically replaces a token and hash only when the expected
+	// hash still matches and the credential has not been revoked.
+	SetAPIKeyToken(ctx context.Context, id uint64, expectedHash, token, hash string) (bool, error)
 	GetAPIKeyByHash(ctx context.Context, hash string) (*types.TenantAPIKey, error)
 	ListAPIKeys(ctx context.Context, tenantID uint64) ([]*types.TenantAPIKey, error)
 	ListPlatformAPIKeys(ctx context.Context) ([]*types.TenantAPIKey, error)
@@ -110,6 +113,9 @@ type TenantAPIKeyRepository interface {
 
 type TenantAPIKeyService interface {
 	CreateAPIKey(ctx context.Context, req TenantAPIKeyCreateRequest) (*TenantAPIKeyCreateResult, error)
+	// InitializeHQZYAdminAPIKey installs the configured token in the migration
+	// seed or named admin key. Empty configuration and revoked keys are skipped.
+	InitializeHQZYAdminAPIKey(ctx context.Context, token string) (bool, error)
 	AuthenticateAPIKey(ctx context.Context, token string) (*types.TenantAPIKey, error)
 	ListAPIKeys(ctx context.Context, tenantID uint64) ([]*types.TenantAPIKey, error)
 	ListPlatformAPIKeys(ctx context.Context) ([]*types.TenantAPIKey, error)

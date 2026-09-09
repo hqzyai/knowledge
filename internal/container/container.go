@@ -200,6 +200,9 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	logger.Debugf(ctx, "[Container] Registering business services...")
 	must(container.Provide(service.NewTenantService))
 	must(container.Provide(service.NewTenantAPIKeyService))
+	// Complete the one-time administrator credential seed after SQL migrations
+	// for both server and desktop startup, before serving authenticated requests.
+	must(container.Invoke(initializeHQZYAdminAPIKey))
 	must(container.Provide(service.NewTenantMemberService))
 	must(container.Provide(service.NewTenantInvitationService))
 	must(container.Provide(service.NewAuditLogService))

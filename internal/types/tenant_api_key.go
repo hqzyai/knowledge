@@ -37,6 +37,13 @@ type TenantAPIKey struct {
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
 
+// HQZYAdminAPIKeyPendingHash identifies the one-time credential seed inserted
+// by migrations 000094 (PostgreSQL) and 000016 (SQLite). Startup replaces it
+// with the hash of the configured token; it is never an authentication credential.
+const HQZYAdminAPIKeyPendingHash = "bootstrap-hqzy-admin-pending"
+
+const HQZYAdminAPIKeyName = "HQZY Admin Full Access"
+
 type APIKeyScopeType string
 
 const (

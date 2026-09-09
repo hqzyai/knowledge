@@ -8,6 +8,7 @@ import (
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var ErrTenantAPIKeyNotFound = errors.New("tenant api key not found")
@@ -22,6 +23,21 @@ func NewTenantAPIKeyRepository(db *gorm.DB) interfaces.TenantAPIKeyRepository {
 
 func (r *tenantAPIKeyRepository) CreateAPIKey(ctx context.Context, key *types.TenantAPIKey) error {
 	return r.db.WithContext(ctx).Create(key).Error
+}
+
+func (r *tenantAPIKeyRepository) SetAPIKeyToken(
+	ctx context.Context, id uint64, expectedHash, token, hash string,
+) (bool, error) {
+	// Use the model hook so SYSTEM_AES_KEY protects the token at rest. The
+	// conditional UPDATE atomically installs both token and hash, including
+	// when multiple application instances start against the same seed.
+	key := &types.TenantAPIKey{APIKey: token, KeyHash: hash}
+	// SQL tracing can include bound secrets even on an error; suppress it for
+	// this write and let the caller report the error without the token.
+	res := r.db.WithContext(ctx).Session(&gorm.Session{Logger: r.db.Logger.LogMode(gormlogger.Silent)}).Model(key).
+		Where("id = ? AND key_hash = ? AND revoked_at IS NULL", id, expectedHash).
+		Select("api_key", "key_hash", "updated_at").Updates(key)
+	return res.RowsAffected == 1, res.Error
 }
 
 func (r *tenantAPIKeyRepository) GetAPIKeyByHash(ctx context.Context, hash string) (*types.TenantAPIKey, error) {

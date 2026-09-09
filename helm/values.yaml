@@ -395,6 +395,9 @@ secrets:
   redisPassword: ""
   # -- JWT signing secret (REQUIRED: change in production)
   jwtSecret: ""
+  # -- Fixed Full Access API key for workspace 10000, shared with trusted clients.
+  # Starts with sk-, 32-256 URL-safe characters. Empty disables bootstrap.
+  bootstrapAdminApiKey: ""
   # -- System AES-256 key for database field encryption (must be exactly 32 bytes).
   # Encrypts: tenants.api_key, model API keys, vector store credentials,
   # web search provider keys, WeKnoraCloud.AppSecret.
@@ -412,6 +415,7 @@ secrets:
 
   # -- Use existing secret instead of creating one
   # The secret must contain keys: DB_USER, DB_PASSWORD, DB_NAME, REDIS_USERNAME, REDIS_PASSWORD, JWT_SECRET, SYSTEM_AES_KEY
+  # Optional: WEKNORA_BOOTSTRAP_ADMIN_API_KEY for the fixed HQZY administrator key.
   existingSecret: ""
 
 # -----------------------------------------------------------------------------

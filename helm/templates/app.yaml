@@ -104,6 +104,12 @@ spec:
                 secretKeyRef:
                   name: {{ include "weknora.secretName" . }}
                   key: SYSTEM_AES_KEY
+            - name: WEKNORA_BOOTSTRAP_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "weknora.secretName" . }}
+                  key: WEKNORA_BOOTSTRAP_ADMIN_API_KEY
+                  optional: true
             # Retrieval & Storage
             - name: RETRIEVE_DRIVER
               value: {{ .Values.app.env.RETRIEVE_DRIVER | quote }}
