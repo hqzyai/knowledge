@@ -219,6 +219,7 @@ import { useRoleLabel, useHomeTenant } from '@/composables/useRoleLabel'
 import { getRootZoom, rectToCssPx, cssViewportSize } from '@/utils/zoom'
 import { openNewUserGuide } from '@/config/contextualGuides'
 import { SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE } from '@/config/settingsAccess'
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import { SKILL_ICON } from '@/types/mention'
 
 const { t } = useI18n()
@@ -262,9 +263,11 @@ const canManageModels = computed(() =>
   authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.models),
 )
 const canManageSkills = computed(() =>
-  authStore.canAccessAllTenants ||
-  authStore.isSystemAdmin ||
-  authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.skills),
+  isSettingsSectionVisible('skills') && (
+    authStore.canAccessAllTenants ||
+    authStore.isSystemAdmin ||
+    authStore.hasRole(SETTINGS_MANAGEMENT_SHORTCUT_MIN_ROLE.skills)
+  ),
 )
 
 const menuRef = ref<HTMLElement>()

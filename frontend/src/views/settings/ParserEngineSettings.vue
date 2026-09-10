@@ -380,6 +380,7 @@
 </template>
 
 <script setup lang="ts">
+import { isParserEngineVisible } from '@/config/uiVisibility'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUIStore } from '@/stores/ui'
@@ -527,6 +528,7 @@ function getEngineDisplayDesc(engineName: string, fallback: string): string {
 }
 
 function openDrawer(engine: ParserEngineInfo) {
+  if (!isParserEngineVisible(engine.Name)) return
   currentEngine.value = engine
   drawerVisible.value = true
   saveMessage.value = ''
@@ -585,7 +587,11 @@ async function loadConfig() {
 async function loadAll() {
   loading.value = true
   error.value = ''
-  await Promise.all([loadEngines(), loadConfig(), checkWkcStatus()])
+  await Promise.all([
+    loadEngines(),
+    loadConfig(),
+    ...(isParserEngineVisible('weknoracloud') ? [checkWkcStatus()] : []),
+  ])
   loading.value = false
 }
 
@@ -769,7 +775,7 @@ onMounted(loadAll)
 // ---- 引擎卡片布局 ----
 .engine-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 12px;
   margin-top: 24px;
 }

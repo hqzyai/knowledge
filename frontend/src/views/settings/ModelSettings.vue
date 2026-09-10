@@ -267,6 +267,7 @@
 </template>
 
 <script setup lang="ts">
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { AddIcon, PlayCircleIcon } from 'tdesign-icons-vue-next'
@@ -383,7 +384,9 @@ function convertToLegacyFormat(model: ModelConfig) {
 }
 
 // 平铺 + 过滤
-const allLegacyModels = computed(() => allModels.value.map(convertToLegacyFormat))
+const allLegacyModels = computed(() => allModels.value.map(convertToLegacyFormat).filter(model =>
+  isSettingsSectionVisible(model.source === 'local' ? 'ollama' : model.provider || ''),
+))
 const filteredModels = computed(() => {
   if (activeTypeFilter.value === 'all') return allLegacyModels.value
   return allLegacyModels.value.filter(m => m._modelType === activeTypeFilter.value)

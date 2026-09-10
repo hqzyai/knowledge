@@ -5,6 +5,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
 import {
   focusAgentEditorSection,
@@ -107,7 +108,7 @@ const guideSteps = computed<SpotlightGuideStep[]>(() => {
     interact: true,
   })
 
-  return steps
+  return steps.filter(step => step.key !== 'navWebsearch' || isSettingsSectionVisible('websearch'))
 })
 
 let openTimer: ReturnType<typeof setTimeout> | null = null

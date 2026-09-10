@@ -75,7 +75,7 @@
                     </div>
 
                     <!-- 集成渠道状态（编辑模式，配置在集成中心） -->
-                    <div v-if="editorMode === 'edit' && editorAgent?.id" class="setting-row">
+                    <div v-if="isSettingsSectionVisible('integration-im') && editorMode === 'edit' && editorAgent?.id" class="setting-row">
                       <div class="setting-info">
                         <label>{{ $t('integrations.agentEditor.label') }}</label>
                         <p class="desc">{{ isPostCreateSession ? $t('agent.editor.postCreateHint.integrationDesc') : $t('integrations.agentEditor.desc') }}</p>
@@ -1228,7 +1228,7 @@
                 </div>
 
                 <!-- MCP 服务配置（仅 Agent 模式） -->
-                <div v-show="currentSection === 'mcp' && isAgentMode" class="section">
+                <div v-if="isSettingsSectionVisible('mcp')" v-show="currentSection === 'mcp' && isAgentMode" class="section">
                   <div class="section-header">
                     <h2>{{ $t('agentEditor.mcp.label') }}</h2>
                     <p class="section-description">{{ $t('agentEditor.mcp.desc') }}</p>
@@ -1280,7 +1280,7 @@
                 </div>
 
                 <!-- 技能：脚本跑在所选沙箱里，可用列表也来自这份配置 -->
-                <div v-show="currentSection === 'skills' && isAgentMode" class="section">
+                <div v-if="isSettingsSectionVisible('skills')" v-show="currentSection === 'skills' && isAgentMode" class="section">
                   <div class="section-header">
                     <h2>{{ $t('agent.editor.skillsConfig') }}</h2>
                     <p class="section-description">{{ $t('agent.editor.skillsConfigDesc') }}</p>
@@ -1550,7 +1550,7 @@
                 </div>
 
                 <!-- 网络搜索配置 -->
-                <div v-show="currentSection === 'websearch'" class="section">
+                <div v-if="isSettingsSectionVisible('websearch')" v-show="currentSection === 'websearch'" class="section">
                   <div class="section-header">
                     <h2>{{ $t('agent.editor.webSearchConfig') }}</h2>
                     <p class="section-description">{{ $t('agent.editor.webSearchConfigDesc') }}</p>
@@ -1824,6 +1824,7 @@
 </template>
 
 <script setup lang="ts">
+import { isSettingsSectionVisible } from '@/config/uiVisibility';
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import AgentCreateContextualGuide from '@/components/AgentCreateContextualGuide.vue';
@@ -1937,7 +1938,8 @@ const AGENT_EDITOR_SECTION_ALIASES: Record<string, string> = {
 
 function resolveEditorSection(section?: string | null): string {
   const key = section || 'basic';
-  return AGENT_EDITOR_SECTION_ALIASES[key] || key;
+  const resolved = AGENT_EDITOR_SECTION_ALIASES[key] || key;
+  return isSettingsSectionVisible(resolved) ? resolved : 'basic';
 }
 
 const currentSection = ref(resolveEditorSection(props.initialSection));
@@ -2680,7 +2682,7 @@ const navItems = computed(() => {
   if (editorMode.value === 'edit' && editorAgent.value?.id && !editorAgent.value?.is_builtin && !authStore.isLiteMode) {
     items.push({ key: 'share', icon: 'share', label: t('knowledgeEditor.sidebar.share') });
   }
-  return items;
+  return items.filter(item => isSettingsSectionVisible(item.key));
 });
 
 // 左侧导航分组（参考「头像-设置」的分组方式）
@@ -3003,6 +3005,7 @@ const agentIMChannelCount = ref(0);
 const agentEmbedChannelCount = ref(0);
 
 async function loadAgentIntegrationCounts(agentId: string) {
+  if (!isSettingsSectionVisible('integration-im') && !isSettingsSectionVisible('integration-embed')) return;
   try {
     const [imResp, embedResp] = await Promise.all([
       listIMChannels(agentId),

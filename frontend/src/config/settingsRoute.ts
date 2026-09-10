@@ -1,4 +1,5 @@
 import { INTEGRATION_TABS, type IntegrationTab } from './integrations'
+import { isSettingsSectionVisible } from './uiVisibility'
 
 export const INTEGRATION_SECTION_PREFIX = 'integration-'
 
@@ -36,12 +37,11 @@ function isBareIntegrationTab(section: string): section is IntegrationTab {
  */
 export function normalizeSettingsSection(section: string, tab?: string | null): string {
   if (section === 'integrations') {
-    return integrationSectionKey(integrationTabFromSection(tab || 'im'))
+    section = integrationSectionKey(integrationTabFromSection(tab || 'api'))
+  } else if (isBareIntegrationTab(section)) {
+    section = integrationSectionKey(section)
   }
-  if (isBareIntegrationTab(section)) {
-    return integrationSectionKey(section)
-  }
-  return section
+  return isSettingsSectionVisible(section) ? section : 'general'
 }
 
 /**
@@ -52,6 +52,7 @@ export function buildSettingsRouteQuery(
   sectionKey: string,
   currentQuery: object = {},
 ): SettingsRouteQuery {
+  sectionKey = normalizeSettingsSection(sectionKey)
   const query: SettingsRouteQuery = { ...(currentQuery as SettingsRouteQuery) }
   delete query.tab
   if (!isIntegrationSection(sectionKey)) {

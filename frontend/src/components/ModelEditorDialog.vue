@@ -72,6 +72,7 @@
               <span class="source-option__label">{{ $t('model.editor.sourceRemote') }}</span>
             </button>
             <button
+              v-if="isSettingsSectionVisible('ollama')"
               type="button"
               class="source-option"
               :class="{ 'is-active': formData.source === 'local', 'is-disabled': ollamaServiceStatus === false || activeModelType === 'rerank' }"
@@ -86,13 +87,13 @@
           </div>
 
           <!-- ReRank模型不支持Ollama的提示信息 -->
-          <div v-if="activeModelType === 'rerank'" class="ollama-unavailable-tip rerank-tip">
+          <div v-if="isSettingsSectionVisible('ollama') && activeModelType === 'rerank'" class="ollama-unavailable-tip rerank-tip">
             <t-icon name="info-circle-filled" class="tip-icon info" />
             <span class="tip-text">{{ $t('model.editor.ollamaNotSupportRerank') }}</span>
           </div>
 
           <!-- Ollama不可用时的提示信息 -->
-          <div v-else-if="shouldShowOllamaUnavailableTip(formData.source, activeModelType, ollamaServiceStatus)"
+          <div v-else-if="isSettingsSectionVisible('ollama') && shouldShowOllamaUnavailableTip(formData.source, activeModelType, ollamaServiceStatus)"
             class="ollama-unavailable-tip">
             <t-icon name="error-circle-filled" class="tip-icon" />
             <span class="tip-text">{{ $t('model.editor.ollamaUnavailable') }}</span>
@@ -174,7 +175,7 @@
           </div>
 
           <!-- WeKnoraCloud 提示信息 -->
-          <template v-if="formData.provider === 'weknoracloud'">
+          <template v-if="isSettingsSectionVisible('weknoracloud') && formData.provider === 'weknoracloud'">
             <!-- 凭证已配置 -->
             <div v-if="wkcCredentialState === 'configured'" class="weknoracloud-hint weknoracloud-hint--ok">
               <t-icon name="check-circle-filled" class="hint-icon hint-icon--ok" />
@@ -403,6 +404,7 @@
 </template>
 
 <script setup lang="ts">
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import { ref, watch, computed, onUnmounted, nextTick } from 'vue'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { checkOllamaModels, checkRemoteModel, testEmbeddingModel, checkRerankModel, checkASRModel, listOllamaModels, downloadOllamaModel, getDownloadProgress, checkOllamaStatus, listModelProviders, type OllamaModelInfo, type ModelProviderOption } from '@/api/initialization'
@@ -665,7 +667,7 @@ const loadProviders = async () => {
 const providerOptions = computed(() => {
   // API 数据可用时，用 API 的结构数据 + i18n 的显示文本
   if (apiProviderOptions.value.length > 0) {
-    return apiProviderOptions.value.map(p => ({
+    return apiProviderOptions.value.filter(p => isSettingsSectionVisible(p.value)).map(p => ({
       ...p,
       label: te(`model.editor.providers.${p.value}.label`)
         ? t(`model.editor.providers.${p.value}.label`)
@@ -677,7 +679,7 @@ const providerOptions = computed(() => {
   }
   // 回退到硬编码值，按 modelTypes 过滤
   return fallbackProviderOptions.value.filter(p =>
-    p.modelTypes.includes(activeModelType.value)
+    isSettingsSectionVisible(p.value) && p.modelTypes.includes(activeModelType.value)
   )
 })
 
@@ -1058,7 +1060,7 @@ const selectModelType = async (type: EditorModelType) => {
 watch(() => props.visible, (val) => {
   if (val) {
     // 检查Ollama服务状态
-    checkOllamaServiceStatus()
+    if (isSettingsSectionVisible('ollama')) checkOllamaServiceStatus()
 
     // 从 API 加载 Model Provider 列表
     loadProviders()

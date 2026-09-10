@@ -31,7 +31,7 @@ test('every settings nav item writes only section', () => {
       section: 'integrations',
       tab: 'im',
     }),
-    { section: 'integration-claw' },
+    { section: 'general' },
   )
   assert.deepEqual(
     buildSettingsRouteQuery(integrationSectionKey('api'), {
@@ -45,10 +45,10 @@ test('every settings nav item writes only section', () => {
 
 test('legacy api / integrations / bare-tab query strings normalize to nav keys', () => {
   assert.equal(normalizeSettingsSection('api'), 'integration-api')
-  assert.equal(normalizeSettingsSection('claw'), 'integration-claw')
-  assert.equal(normalizeSettingsSection('integrations', 'embed'), 'integration-embed')
-  assert.equal(normalizeSettingsSection('integrations'), 'integration-im')
-  assert.equal(normalizeSettingsSection('integration-chrome'), 'integration-chrome')
+  assert.equal(normalizeSettingsSection('claw'), 'general')
+  assert.equal(normalizeSettingsSection('integrations', 'embed'), 'general')
+  assert.equal(normalizeSettingsSection('integrations'), 'integration-api')
+  assert.equal(normalizeSettingsSection('integration-chrome'), 'general')
   assert.equal(normalizeSettingsSection('system-global'), 'system-global')
   assert.equal(isIntegrationSection('integration-chrome'), true)
   assert.equal(isIntegrationSection('models'), false)
@@ -70,4 +70,21 @@ test('canonical settings query skips a redundant replace', () => {
     ),
     false,
   )
+})
+
+
+test('hidden settings links and legacy aliases fall back without retaining integration context', () => {
+  const hidden = [
+    'envvars', 'ollama', 'weknoracloud', 'sandbox', 'skills', 'websearch', 'mcp', 'system',
+    'im', 'embed', 'chrome', 'claw',
+    'integration-im', 'integration-embed', 'integration-chrome', 'integration-claw',
+  ]
+  for (const section of hidden) {
+    assert.equal(normalizeSettingsSection(section), 'general', section)
+    assert.deepEqual(buildSettingsRouteQuery(section, { tab: 'im', agentId: 'agent-1' }), {
+      section: 'general',
+    }, section)
+  }
+  assert.equal(normalizeSettingsSection('integrations', 'api'), 'integration-api')
+  assert.equal(normalizeSettingsSection('parser'), 'parser')
 })

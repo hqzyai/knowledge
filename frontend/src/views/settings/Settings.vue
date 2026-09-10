@@ -98,24 +98,9 @@
                     <GeneralSettings />
                   </div>
 
-                  <!-- Ollama 设置 -->
-                  <div v-if="currentSection === 'ollama'" class="section">
-                    <OllamaSettings />
-                  </div>
-
-                  <!-- WeKnora Cloud -->
-                  <div v-if="currentSection === 'weknoracloud'" class="section">
-                    <WeKnoraCloudSettings />
-                  </div>
-
                   <!-- 模型配置 -->
                   <div v-if="currentSection === 'models'" class="section">
                     <ModelSettings />
-                  </div>
-
-                  <!-- 网络搜索配置 -->
-                  <div v-if="currentSection === 'websearch'" class="section">
-                    <WebSearchSettings />
                   </div>
 
                   <!-- 消息管理 -->
@@ -133,11 +118,6 @@
                     <MemorySettings />
                   </div>
 
-                  <!-- 沙箱密钥（成员自己的技能 / 沙箱密钥） -->
-                  <div v-if="currentSection === 'envvars'" class="section">
-                    <EnvVarSettings />
-                  </div>
-
                   <!-- 向量数据库引擎 -->
                   <div v-if="currentSection === 'vectorstore'" class="section">
                     <VectorStoreSettings />
@@ -151,21 +131,6 @@
                   <!-- 存储引擎 -->
                   <div v-if="currentSection === 'storage'" class="section">
                     <StorageEngineSettings />
-                  </div>
-
-                  <!-- 沙箱 -->
-                  <div v-if="currentSection === 'sandbox'" class="section">
-                    <SandboxSettings />
-                  </div>
-
-                  <!-- 技能目录：登记后可装到多份沙箱，智能体只从当前沙箱的就绪集合选用 -->
-                  <div v-if="currentSection === 'skills'" class="section">
-                    <SkillSettings :initial-sandbox-id="currentSubSection" />
-                  </div>
-
-                  <!-- 系统信息 -->
-                  <div v-if="currentSection === 'system'" class="section">
-                    <SystemInfo />
                   </div>
 
                   <!-- 系统管理员可见的全局运行时设置 -->
@@ -207,10 +172,6 @@
                     <IntegrationSettingsSection :tab="integrationTabFromSection(currentSection)" />
                   </div>
 
-                  <!-- MCP 服务 -->
-                  <div v-if="currentSection === 'mcp'" class="section">
-                    <McpSettings />
-                  </div>
                 </template>
               </div>
             </div>
@@ -230,24 +191,16 @@ import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
 import { useI18n } from 'vue-i18n'
 import { MessagePlugin } from 'tdesign-vue-next'
-import SystemInfo from './SystemInfo.vue'
 import TenantInfo from './TenantInfo.vue'
 import UserProfile from './UserProfile.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import ModelSettings from './ModelSettings.vue'
-import OllamaSettings from './OllamaSettings.vue'
-import McpSettings from './McpSettings.vue'
-import WebSearchSettings from './WebSearchSettings.vue'
 import ChatHistorySettings from './ChatHistorySettings.vue'
 import MemorySettings from './MemorySettings.vue'
-import EnvVarSettings from './EnvVarSettings.vue'
 import MemoryWorkspaceSettings from './MemoryWorkspaceSettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
 import ParserEngineSettings from './ParserEngineSettings.vue'
 import StorageEngineSettings from './StorageBackendSettings.vue'
-import SandboxSettings from './SandboxSettings.vue'
-import SkillSettings from './SkillSettings.vue'
-import WeKnoraCloudSettings from './WeKnoraCloudSettings.vue'
 import TenantMembers from './TenantMembers.vue'
 import SystemSettings from '@/views/system/SystemSettings.vue'
 import RuntimeQueues from '@/views/system/RuntimeQueues.vue'
@@ -264,6 +217,7 @@ import {
   SYSTEM_ADMIN_SETTINGS_SECTIONS,
 } from '@/config/settingsAccess'
 import { SETTINGS_SECTION_CAPABILITY } from '@/config/deploymentCapabilities'
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import { SKILL_ICON } from '@/types/mention'
 import {
   buildSettingsRouteQuery,
@@ -340,6 +294,7 @@ const isSectionSupported = (key: string): boolean => {
 }
 
 const canSeeSection = (key: string): boolean => {
+  if (!isSettingsSectionVisible(key)) return false
   if (isIntegrationSection(key)) {
     const min = INTEGRATION_TAB_MIN_ROLE[integrationTabFromSection(key)]
     if (!min) return true
@@ -865,6 +820,7 @@ onUnmounted(() => {
 /* 右侧内容区域 */
 .settings-content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   background-color: var(--td-bg-color-container);
 }
@@ -990,6 +946,35 @@ onUnmounted(() => {
     color: var(--td-text-color-secondary);
     max-width: 360px;
     line-height: 1.6;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-overlay {
+    padding: 8px;
+  }
+
+  .settings-modal {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .settings-sidebar {
+    width: 120px;
+    min-width: 120px;
+  }
+
+  .content-wrapper {
+    padding: 48px 12px 24px;
+  }
+
+  .nav-item {
+    padding: 9px 6px;
+    gap: 6px;
+  }
+
+  .nav-group-title {
+    padding-left: 6px;
   }
 }
 </style>

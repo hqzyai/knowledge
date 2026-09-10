@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { normalizeSettingsSection } from '@/config/settingsRoute'
 
 export const useUIStore = defineStore('ui', {
   state: () => ({
@@ -25,8 +26,9 @@ export const useUIStore = defineStore('ui', {
 
   actions: {
     openSettings(section?: string, subSection?: string) {
-      this.settingsInitialSection = section || null
-      this.settingsInitialSubSection = subSection || null
+      const resolved = section ? normalizeSettingsSection(section) : null
+      this.settingsInitialSection = resolved
+      this.settingsInitialSubSection = resolved === section ? subSection || null : null
       this.showSettingsModal = true
     },
 
@@ -136,4 +138,3 @@ export const useUIStore = defineStore('ui', {
     }
   }
 })
-

@@ -32,12 +32,12 @@
         <div class="setting-control">
           <div class="parser-control-stack">
             <t-select
-              :value="getEngineForGroup(group.extensions) || undefined"
+              :value="isParserEngineVisible(getEngineForGroup(group.extensions)) ? getEngineForGroup(group.extensions) || undefined : undefined"
               @change="(val: string) => handleEngineChange(group.extensions, val)"
               :style="embedded ? undefined : { width: '280px' }"
               :class="{ 'parser-engine-select--embedded': embedded }"
               :status="hasAvailableEngine(group.extensions) ? 'default' : 'warning'"
-              :placeholder="$t('kbSettings.parser.noEngine')"
+              :placeholder="hasAvailableEngine(group.extensions) ? $t('kbSettings.parser.title') : $t('kbSettings.parser.noEngine')"
               :popup-props="{ overlayInnerStyle: { maxHeight: '240px' } }"
             >
               <t-option
@@ -66,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import { isParserEngineVisible } from '@/config/uiVisibility'
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { type ParserEngineInfo } from '@/api/system'

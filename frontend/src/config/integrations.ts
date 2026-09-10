@@ -1,4 +1,5 @@
 import type { DeploymentCapabilityKey } from './deploymentCapabilities'
+import { isSettingsSectionVisible } from './uiVisibility'
 
 export const CHROME_EXTENSION_URL =
   'https://chromewebstore.google.com/detail/jpemjbopikggjlmikmclgbmkhhopjdgd?utm_source=item-share-cb'
@@ -27,7 +28,7 @@ export type IntegrationPreviewIcon =
   | { type: 'emoji'; value: string }
 
 /** Sidebar hover preview + Integrations modal nav — add new entries here. */
-export const INTEGRATION_PREVIEW_ITEMS: Array<{
+const integrationPreviewItems: Array<{
   key: IntegrationTab
   icon: IntegrationPreviewIcon
 }> = [
@@ -37,3 +38,7 @@ export const INTEGRATION_PREVIEW_ITEMS: Array<{
   { key: 'chrome', icon: { type: 'icon', name: 'extension' } },
   { key: 'claw', icon: { type: 'emoji', value: '🦞' } },
 ]
+
+export const INTEGRATION_PREVIEW_ITEMS = integrationPreviewItems.filter(item =>
+  isSettingsSectionVisible(`integration-${item.key}`),
+)

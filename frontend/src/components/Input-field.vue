@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSettingsSectionVisible } from '@/config/uiVisibility';
 import { ref, onMounted, onUnmounted, computed, watch, nextTick, h } from "vue";
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
@@ -341,6 +342,7 @@ const agentMCPServiceIds = computed<string[]>(() => {
 });
 
 const isMCPAllowedByAgent = (service: MCPService) => {
+  if (!isSettingsSectionVisible('mcp')) return false;
   if (!settingsStore.isAgentStreamMode || !service.enabled) return false;
   const mode = agentMCPSelectionMode.value;
   if (mode === 'none') return false;
@@ -359,7 +361,7 @@ const agentSelectedSkills = computed<string[]>(() => {
 });
 
 const isSkillAllowedByAgent = (skillName: string) => {
-  if (!settingsStore.isAgentStreamMode || !editorResources.skillsAvailable) return false;
+  if (!isSettingsSectionVisible('skills') || !settingsStore.isAgentStreamMode || !editorResources.skillsAvailable) return false;
   const mode = agentSkillsSelectionMode.value;
   if (mode === 'none') return false;
   if (mode === 'selected') return agentSelectedSkills.value.includes(skillName);
@@ -447,6 +449,7 @@ const isImageUploadEnabledByAgent = computed(() => {
 
 // Input 工具栏：仅当智能体已启用且搜索引擎可用时才显示
 const showWebSearchButton = computed(() => {
+  if (!isSettingsSectionVisible('websearch')) return false;
   if (hasAgentConfig.value && settingsStore.selectedAgentSourceTenantId && !isWebSearchReadinessKnown.value) {
     return false;
   }
@@ -1353,7 +1356,7 @@ const loadMentionItems = async (q: string, resetIndex = true, append = false) =>
     }
 
     const skillsMode = agentSkillsSelectionMode.value;
-    if (skillsMode !== 'none') {
+    if (isSettingsSectionVisible('skills') && skillsMode !== 'none') {
       await editorResources.ensureSkills(currentAgentConfig.value?.sandbox_config_id);
       skillItems = editorResources.skills
         .filter(skill => isSkillAllowedByAgent(skill.name))

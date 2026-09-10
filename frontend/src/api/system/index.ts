@@ -1,4 +1,5 @@
 import { get, post, put, del, patch, postUpload } from '@/utils/request'
+import { visibleParserEngines } from '@/config/uiVisibility'
 import type { CreatedTenantAPIKey, TenantAPIKey, TenantAPIKeyCapability } from '@/api/tenant'
 
 export interface CreatePlatformAPIKeyPayload {
@@ -150,13 +151,15 @@ export interface ParserEnginesResponse {
   connected?: boolean
 }
 
-export function getParserEngines(): Promise<ParserEnginesResponse> {
-  return get('/api/v1/system/parser-engines')
+export async function getParserEngines(): Promise<ParserEnginesResponse> {
+  const response: ParserEnginesResponse = await get('/api/v1/system/parser-engines')
+  return { ...response, data: visibleParserEngines(response.data ?? []) }
 }
 
 /** 使用当前填写的参数检测引擎可用性（不保存），用于填写新参数后即时测试 */
-export function checkParserEngines(config: ParserEngineConfig): Promise<ParserEnginesResponse> {
-  return post('/api/v1/system/parser-engines/check', config)
+export async function checkParserEngines(config: ParserEngineConfig): Promise<ParserEnginesResponse> {
+  const response: ParserEnginesResponse = await post('/api/v1/system/parser-engines/check', config)
+  return { ...response, data: visibleParserEngines(response.data ?? []) }
 }
 
 export function getParserEngineConfig(): Promise<{ data: ParserEngineConfig }> {
