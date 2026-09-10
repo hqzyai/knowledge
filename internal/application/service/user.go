@@ -653,30 +653,17 @@ func (s *userService) LoginWithOIDC(
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(userInfo.Email) == "" {
-		return nil, errors.New("OIDC provider did not return email")
-	}
-
-	user, err := s.userRepo.GetUserByEmail(ctx, userInfo.Email)
-	if err != nil && !isUserLookupNotFound(err) {
-		return nil, fmt.Errorf("failed to query user by email: %w", err)
-	}
-	isNewUser := false
-	if isUserLookupNotFound(err) || user == nil {
-		user, err = s.provisionOIDCUser(ctx, userInfo, provisioning)
-		if err != nil {
-			return nil, err
-		}
-		isNewUser = true
-	}
-
-	if !user.IsActive {
-		return &types.OIDCCallbackResponse{Success: false, Message: "Account is disabled"}, nil
+	user, isNewUser, err := s.resolveOIDCAccount(ctx, cfg, userInfo, provisioning)
+	if err != nil {
+		return nil, err
 	}
 
 	// Resolve target tenant once so the JWT claim and the tenant we
 	// return below stay in sync; see Login for the rationale.
-	resolvedTenantID := s.resolveLoginTenantID(ctx, user)
+	resolvedTenantID := cfg.ExistingUserTenantID
+	if resolvedTenantID == 0 {
+		resolvedTenantID = s.resolveLoginTenantID(ctx, user)
+	}
 	accessToken, refreshToken, err := s.generateTokensForTenant(ctx, user, resolvedTenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate local tokens: %w", err)
@@ -1753,6 +1740,12 @@ func (s *userService) resolveOIDCUserInfo(ctx context.Context, cfg *config.OIDCA
 			}
 			logger.Warnf(ctx, "Failed to fetch OIDC userinfo, using verified id_token claims: %v", err)
 		} else {
+			if verifiedFromIDToken {
+				userinfoSubject, ok := userInfoClaims["sub"].(string)
+				if !ok || userinfoSubject != claims["sub"] {
+					return nil, errors.New("OIDC userinfo subject does not match verified id_token")
+				}
+			}
 			for k, v := range userInfoClaims {
 				claims[k] = v
 			}

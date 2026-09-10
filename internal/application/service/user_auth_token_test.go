@@ -46,6 +46,13 @@ type stubUserRepoForAuth struct {
 	updateCalls int
 }
 
+func (*stubUserRepoForAuth) GetOIDCIdentity(context.Context, string, string) (*types.UserOIDCIdentity, error) {
+	return nil, nil
+}
+func (*stubUserRepoForAuth) BindOIDCIdentity(context.Context, *types.UserOIDCIdentity) error {
+	return nil
+}
+
 func (s *stubUserRepoForAuth) CreateUser(context.Context, *types.User) error { return nil }
 func (s *stubUserRepoForAuth) GetUserByID(_ context.Context, id string) (*types.User, error) {
 	user, ok := s.users[id]

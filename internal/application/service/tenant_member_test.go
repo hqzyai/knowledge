@@ -263,6 +263,7 @@ func newServiceWithRepo() (interfaces.TenantMemberService, *fakeTenantMemberRepo
 // cleanupUserRepo is a minimal UserRepository used to assert that
 // RemoveMember clears dangling home-tenant pointers (#2586).
 type cleanupUserRepo struct {
+	interfaces.UserRepository
 	users map[string]*types.User
 }
 
