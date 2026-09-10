@@ -172,6 +172,16 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 	if !provisioning.IsValid() {
 		return nil, fmt.Errorf("invalid tenant provisioning mode %q", provisioning)
 	}
+	var sharedTenant *types.Tenant
+	if provisioning == types.TenantProvisioningJoinExisting {
+		if req.JoinTenantID == 0 || s.tenantService == nil || s.memberService == nil {
+			return nil, errors.New("new user workspace is not configured")
+		}
+		sharedTenant, err = s.tenantService.GetTenantByID(ctx, req.JoinTenantID)
+		if err != nil || sharedTenant == nil || sharedTenant.Status != "active" {
+			return nil, errors.New("new user workspace is unavailable")
+		}
+	}
 
 	var createdTenant *types.Tenant
 	if provisioning == types.TenantProvisioningCreatePersonal {
@@ -203,6 +213,8 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 	}
 	if createdTenant != nil {
 		user.TenantID = createdTenant.ID
+	} else if sharedTenant != nil {
+		user.TenantID = sharedTenant.ID
 	}
 
 	err = s.userRepo.CreateUser(ctx, user)
@@ -227,6 +239,13 @@ func (s *userService) Register(ctx context.Context, req *types.RegisterRequest) 
 			_ = s.userRepo.DeleteUser(ctx, user.ID)
 			_ = s.tenantService.DeleteTenant(ctx, createdTenant.ID)
 			return nil, errors.New("failed to finalise workspace ownership")
+		}
+	}
+
+	if sharedTenant != nil {
+		if _, err := s.memberService.AddMember(ctx, user.ID, sharedTenant.ID, types.TenantRoleContributor, nil); err != nil {
+			_ = s.userRepo.DeleteUser(ctx, user.ID)
+			return nil, fmt.Errorf("failed to join new user workspace: %w", err)
 		}
 	}
 
@@ -653,17 +672,30 @@ func (s *userService) LoginWithOIDC(
 	if err != nil {
 		return nil, err
 	}
-	user, isNewUser, err := s.resolveOIDCAccount(ctx, cfg, userInfo, provisioning)
-	if err != nil {
-		return nil, err
+	if strings.TrimSpace(userInfo.Email) == "" {
+		return nil, errors.New("OIDC provider did not return email")
+	}
+
+	user, err := s.userRepo.GetUserByEmail(ctx, userInfo.Email)
+	if err != nil && !isUserLookupNotFound(err) {
+		return nil, fmt.Errorf("failed to query user by email: %w", err)
+	}
+	isNewUser := false
+	if isUserLookupNotFound(err) || user == nil {
+		user, err = s.provisionOIDCUser(ctx, userInfo, provisioning, cfg.NewUserTenantID)
+		if err != nil {
+			return nil, err
+		}
+		isNewUser = true
+	}
+
+	if !user.IsActive {
+		return &types.OIDCCallbackResponse{Success: false, Message: "Account is disabled"}, nil
 	}
 
 	// Resolve target tenant once so the JWT claim and the tenant we
 	// return below stay in sync; see Login for the rationale.
-	resolvedTenantID := cfg.ExistingUserTenantID
-	if resolvedTenantID == 0 {
-		resolvedTenantID = s.resolveLoginTenantID(ctx, user)
-	}
+	resolvedTenantID := s.resolveLoginTenantID(ctx, user)
 	accessToken, refreshToken, err := s.generateTokensForTenant(ctx, user, resolvedTenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate local tokens: %w", err)
@@ -1740,12 +1772,6 @@ func (s *userService) resolveOIDCUserInfo(ctx context.Context, cfg *config.OIDCA
 			}
 			logger.Warnf(ctx, "Failed to fetch OIDC userinfo, using verified id_token claims: %v", err)
 		} else {
-			if verifiedFromIDToken {
-				userinfoSubject, ok := userInfoClaims["sub"].(string)
-				if !ok || userinfoSubject != claims["sub"] {
-					return nil, errors.New("OIDC userinfo subject does not match verified id_token")
-				}
-			}
 			for k, v := range userInfoClaims {
 				claims[k] = v
 			}
@@ -1804,15 +1830,13 @@ func (s *userService) fetchOIDCUserInfo(ctx context.Context, endpoint, accessTok
 }
 
 // provisionOIDCUser auto-creates a local account for a first-time OIDC
-// login. The provisioning mode is decided by the caller (the OIDC callback
-// handler resolves it from the same auth.default_tenant_mode system-setting
-// that governs public password registration) so both entry points share a
-// single deployment policy. An empty mode falls back to create_personal via
-// Register's own defaulting.
+// login. A configured OIDC new-user workspace overrides the default only for
+// newly created accounts; otherwise the caller's provisioning policy applies.
 func (s *userService) provisionOIDCUser(
 	ctx context.Context,
 	info *types.OIDCUserInfo,
 	provisioning types.TenantProvisioningMode,
+	newUserTenantID uint64,
 ) (*types.User, error) {
 	username := s.generateOIDCUsername(ctx, info)
 	randomPassword, err := generateRandomString(32)
@@ -1820,11 +1844,15 @@ func (s *userService) provisionOIDCUser(
 		return nil, fmt.Errorf("failed to generate password for OIDC user: %w", err)
 	}
 
+	if newUserTenantID != 0 {
+		provisioning = types.TenantProvisioningJoinExisting
+	}
 	user, err := s.Register(ctx, &types.RegisterRequest{
 		Username:           username,
 		Email:              info.Email,
 		Password:           randomPassword,
 		TenantProvisioning: provisioning,
+		JoinTenantID:       newUserTenantID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to auto-provision OIDC user: %w", err)

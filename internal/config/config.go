@@ -308,9 +308,9 @@ type OIDCUserInfoMapping struct {
 }
 
 type OIDCAuthConfig struct {
-	// ExistingUserTenantID disables OIDC auto-registration when nonzero.
-	// Only active members of this workspace may sign in, and land there.
-	ExistingUserTenantID  uint64               `yaml:"existing_user_tenant_id" json:"existing_user_tenant_id"`
+	// NewUserTenantID only controls brand-new OIDC accounts. Existing accounts
+	// retain the usual email matching and workspace selection behavior.
+	NewUserTenantID       uint64               `yaml:"new_user_tenant_id" json:"new_user_tenant_id"`
 	Enable                bool                 `yaml:"enable"                 json:"enable"`
 	IssuerURL             string               `yaml:"issuer_url"             json:"issuer_url"`
 	DiscoveryURL          string               `yaml:"discovery_url"          json:"discovery_url"`

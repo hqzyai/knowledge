@@ -103,9 +103,6 @@ type UserService interface {
 
 // UserRepository defines the user repository interface
 type UserRepository interface {
-	GetOIDCIdentity(ctx context.Context, issuer, subject string) (*types.UserOIDCIdentity, error)
-	// BindOIDCIdentity is idempotent for the same user and rejects reassignment.
-	BindOIDCIdentity(ctx context.Context, identity *types.UserOIDCIdentity) error
 	// CreateUser creates a user
 	CreateUser(ctx context.Context, user *types.User) error
 	// GetUserByID gets a user by ID

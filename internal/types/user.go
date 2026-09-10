@@ -199,6 +199,8 @@ type RegisterRequest struct {
 	// own tenancy semantics. Empty preserves the historical behaviour and is
 	// treated as create_personal by UserService.Register.
 	TenantProvisioning TenantProvisioningMode `json:"-"`
+	// JoinTenantID is supplied only by trusted server-side provisioning policy.
+	JoinTenantID uint64 `json:"-"`
 }
 
 // AdminCreateUserRequest is the payload for a SystemAdmin provisioning a
@@ -214,18 +216,19 @@ type AdminCreateUserRequest struct {
 }
 
 // TenantProvisioningMode controls what UserService.Register does after it
-// has validated the identity fields. Joining an existing tenant is
-// orchestrated by the invitation handler because the invitation token is the
-// authority for the target tenant and role.
+// has validated the identity fields. The join_existing mode is reserved for
+// trusted server-side OIDC policy and grants only Contributor membership.
+// Invitation registration separately derives tenancy from its invitation token.
 type TenantProvisioningMode string
 
 const (
 	TenantProvisioningCreatePersonal TenantProvisioningMode = "create_personal"
 	TenantProvisioningTenantless     TenantProvisioningMode = "tenantless"
+	TenantProvisioningJoinExisting   TenantProvisioningMode = "join_existing"
 )
 
 func (m TenantProvisioningMode) IsValid() bool {
-	return m == TenantProvisioningCreatePersonal || m == TenantProvisioningTenantless
+	return m == TenantProvisioningCreatePersonal || m == TenantProvisioningTenantless || m == TenantProvisioningJoinExisting
 }
 
 // LoginResponse represents a login response
