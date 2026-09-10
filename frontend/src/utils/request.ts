@@ -126,6 +126,13 @@ instance.interceptors.response.use(
     if (!error.response) {
       return Promise.reject({ message: t('error.networkError') });
     }
+
+    if (error.response.status === 403 && error.response.data?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      if (!isEmbedPage() && window.location.pathname !== '/change-password') {
+        window.location.replace('/change-password');
+      }
+      return Promise.reject({ status: 403, message: t('auth.firstLoginPassword.description') });
+    }
     
     // 公开接口（auto-setup / login / register / oidc）的 401 不走 refresh 逻辑，直接返回错误
     if ((error.response.status === 401 || error.response.status === 403) && isPublicAuthRequest(originalRequest?.url)) {

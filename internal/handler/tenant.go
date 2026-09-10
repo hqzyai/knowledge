@@ -1250,7 +1250,7 @@ func (h *TenantHandler) CreateAPIPrincipalTestToken(c *gin.Context) {
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":       externalUserID,
 		"tenant_id": strconv.FormatUint(id, 10),
-		"aud":       "weknora",
+		"aud":       "hqzy-knowledge",
 		"iat":       now.Unix(),
 		"exp":       expiresAt.Unix(),
 	}).SignedString([]byte(secret))

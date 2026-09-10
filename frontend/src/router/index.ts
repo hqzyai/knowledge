@@ -58,6 +58,12 @@ const router = createRouter({
     },
     // Embed chat is a separate entry (embed.html + embed-main.ts), not this SPA.
     {
+      path: "/change-password",
+      name: "firstLoginPassword",
+      component: () => import("../views/auth/FirstLoginPassword.vue"),
+      meta: { requiresAuth: true, requiresInit: false, requiresTenant: false }
+    },
+    {
       path: "/register",
       name: "registerByInvite",
       // Share-link landing page reuses the Login form: the same Vue
@@ -313,6 +319,22 @@ router.beforeEach(async (to, from, next) => {
   // 如果这里先按“未登录”拦截到 /login，会导致回调结果没有机会落盘。
   if (hasPendingOIDCCallback()) {
     next()
+    return
+  }
+
+  // Initial credentials never open the workspace before being changed.
+  if (to.path === '/change-password') {
+    if (!await hydrateSessionFromToken(authStore)) {
+      next('/login')
+    } else if (authStore.user?.preferences?.must_change_password === true) {
+      next()
+    } else {
+      next(authStore.hasValidTenant ? '/platform/knowledge-bases' : '/onboarding/workspace')
+    }
+    return
+  }
+  if (authStore.isLoggedIn && authStore.user?.preferences?.must_change_password === true) {
+    next('/change-password')
     return
   }
 

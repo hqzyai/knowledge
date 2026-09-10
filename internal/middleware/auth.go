@@ -203,6 +203,23 @@ func authenticateJWTUser(
 	jwtTenantID uint64,
 ) bool {
 	ctx := c.Request.Context()
+	if user.Preferences.MustChangePassword {
+		// A temporary-password session can only inspect its identity, change
+		// the password or log out. Do this before tenant resolution, so an
+		// unavailable workspace cannot prevent the user from changing it.
+		path, method := c.Request.URL.Path, c.Request.Method
+		allowed := (method == http.MethodGet && (path == "/api/v1/auth/me" || path == "/api/v1/auth/validate")) ||
+			(method == http.MethodPost && (path == "/api/v1/auth/change-password" || path == "/api/v1/auth/logout"))
+		if !allowed {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "Change your initial password before continuing",
+				"code":  "PASSWORD_CHANGE_REQUIRED",
+			})
+			return false
+		}
+		attachTenantlessUserContext(c, user)
+		return true
+	}
 
 	targetTenantID, tenant, crossTenantSwitch, ok := resolveTargetTenant(c, tenantService, memberService, cfg, user, jwtTenantID)
 	if !ok {
@@ -627,7 +644,8 @@ func verifyExternalUserJWT(tokenString string, tenantID uint64, secret string) (
 	}
 	claims := jwt.MapClaims{}
 	parser := jwt.NewParser(
-		jwt.WithAudience("weknora"),
+		// Accept the previous audience for existing integrations.
+		jwt.WithAudience("hqzy-knowledge", "weknora"),
 		jwt.WithExpirationRequired(),
 		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 	)

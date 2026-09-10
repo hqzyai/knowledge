@@ -18,16 +18,6 @@
             <t-icon name="folder-zip" size="18px" />
           </template>
         </IntegrationExternalCta>
-        <IntegrationExternalCta
-          variant="claw"
-          :label="$t('integrations.claw.installCta')"
-          :hint="$t('integrations.claw.installCtaHint')"
-          @click="openClawHub"
-        >
-          <template #icon>
-            <span class="ext-cta-emoji" role="img" :aria-label="$t('common.clawhubSkill')">🦞</span>
-          </template>
-        </IntegrationExternalCta>
       </div>
     </template>
 
@@ -107,12 +97,6 @@
       </div>
     </template>
 
-    <template #footer>
-      <div class="landing-footer-bar" role="note">
-        <p class="landing-footer-bar__note">{{ $t('integrations.claw.ecosystemNote') }}</p>
-        <span class="landing-meta">{{ $t('integrations.claw.hubMeta') }}</span>
-      </div>
-    </template>
   </IntegrationLandingLayout>
 </template>
 
@@ -123,7 +107,6 @@ import { useI18n } from 'vue-i18n'
 import { copyWithToast } from '@/utils/clipboard'
 import { useRouter } from 'vue-router'
 import { downloadWeKnoraSkill } from '@/api/skill'
-import { CLAWHUB_SKILL_URL } from '@/config/integrations'
 import { useApiBaseUrlDisplay } from '@/composables/useApiBaseUrlDisplay'
 import { useUIStore } from '@/stores/ui'
 import IntegrationLandingLayout from './IntegrationLandingLayout.vue'
@@ -150,9 +133,6 @@ const localInstallCommand = 'unzip weknora-skill.zip\nopenclaw skills install ./
 
 const envExample = 'export WEKNORA_API_KEY="sk-your-api-key"'
 
-const openClawHub = () => {
-  window.open(CLAWHUB_SKILL_URL, '_blank', 'noopener,noreferrer')
-}
 
 const downloadSkill = async () => {
   if (!apiBaseUrlDisplay.value || downloading.value) return

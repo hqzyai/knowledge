@@ -27,11 +27,6 @@
             ? 'modelSettings.builtinModels.descriptionAdmin'
             : 'modelSettings.builtinModels.description') }}
         </p>
-        <a class="doc-link" href="https://github.com/Tencent/WeKnora/blob/main/docs/BUILTIN_MODELS.md" target="_blank"
-          rel="noopener noreferrer">
-          {{ $t('modelSettings.builtinModels.viewGuide') }}
-          <t-icon name="link" class="link-icon" />
-        </a>
       </div>
     </div>
 
@@ -433,6 +428,7 @@ const sourceLabel = (type: ModelType) => {
 const providerLabel = (model: any): string => {
   const id = model.provider
   if (!id) return ''
+  if (id === 'weknoracloud') return t('settings.weknoraCloud.title')
   const key = `model.editor.providers.${id}.label`
   return te(key) ? t(key) : id
 }

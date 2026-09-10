@@ -105,6 +105,11 @@ const persistOIDCLoginResponse = async (response: any) => {
 
   await syncOIDCUserContext()
 
+  if (authStore.user?.preferences?.must_change_password === true) {
+    await router.replace('/change-password')
+    return
+  }
+
   // OIDC 跳转前暂存的邀请 token：拿到会话后兑换并进入对应空间。
   const pendingInviteToken = sessionStorage.getItem('weknora_pending_invite_token')
   if (pendingInviteToken) {
@@ -179,7 +184,7 @@ let invitationPollTimer: ReturnType<typeof setInterval> | null = null
 const INVITATION_POLL_INTERVAL_MS = 2 * 60 * 1000
 
 const startInvitationPolling = () => {
-  if (invitationPollTimer || !authStore.isLoggedIn) return
+  if (invitationPollTimer || !authStore.isLoggedIn || authStore.user?.preferences?.must_change_password) return
   // Immediate fetch so the badge is correct before the first tick.
   authStore.fetchPendingInvitationCount()
   invitationPollTimer = setInterval(() => {
@@ -199,7 +204,7 @@ const stopInvitationPolling = () => {
 // here (rather than only on first mount) handles the OIDC callback
 // flow where the user logs in well after App.vue has already mounted.
 watch(
-  () => authStore.isLoggedIn,
+  () => authStore.isLoggedIn && authStore.user?.preferences?.must_change_password !== true,
   (logged) => {
     if (logged) startInvitationPolling()
     else stopInvitationPolling()

@@ -63,12 +63,12 @@ export default {
     reopen: 'Product tour',
     steps: {
       welcome: {
-        title: 'Welcome to WeKnora',
+        title: 'Welcome to 华清智言知识库',
         desc: 'A few quick steps to get you familiar with knowledge bases, chat and agents. Click "Next" to begin.'
       },
       knowledge: {
         title: 'Create your knowledge base',
-        desc: 'Everything starts here: upload documents, web pages or FAQs and WeKnora parses and indexes them automatically. Click here to open knowledge bases.'
+        desc: 'Everything starts here: upload documents, web pages or FAQs and 华清智言知识库 parses and indexes them automatically. Click here to open knowledge bases.'
       },
       chat: {
         title: 'Start an AI chat',
@@ -1107,12 +1107,12 @@ export default {
       backendDescriptions: {
         cube: 'Self-hosted MicroVM cluster for private or on-premises deployments',
         e2b: 'Managed MicroVM service or an E2B-compatible deployment',
-        docker: 'Keep a long-lived container per session on this WeKnora host; scripts and files stay in that container',
+        docker: 'Keep a long-lived container per session on this 华清智言知识库 host; scripts and files stay in that container',
       },
       dockerDisabledAlert: 'Docker sandbox is not enabled on this deployment',
       dockerDisabledHint: 'A local docker.sock is equivalent to root on the host. For a single-machine private install, a system admin can enable it under Settings → System settings → Network security.',
       dockerDisabledCard: 'Docker sandbox is disabled on this deployment; this config will not create containers',
-      dockerHostRisk: 'Empty or unix:// uses the Docker daemon on the WeKnora host, which is equivalent to root on that machine. Use this only for a private single-node install. Prefer Cube or E2B when multiple workspaces share a host. Remote tcp:// endpoints require a TLS certificate directory.',
+      dockerHostRisk: 'Empty or unix:// uses the Docker daemon on the 华清智言知识库 host, which is equivalent to root on that machine. Use this only for a private single-node install. Prefer Cube or E2B when multiple workspaces share a host. Remote tcp:// endpoints require a TLS certificate directory.',
       addConfig: 'Add sandbox',
       viewClusterGuide: 'Cluster setup guide',
       configName: 'Config name',
@@ -1166,11 +1166,11 @@ export default {
       policySaveFailed: 'Failed to update sandbox execution policy',
       legacyConfig: 'Deprecated',
       namedBackendHint: 'Workspace configuration is the only runtime source. Agents without one cannot execute skill scripts.',
-      weknoraTemplateTitle: 'WeKnora standard template',
-      weknoraDockerImage: 'WeKnora standard image',
+      weknoraTemplateTitle: '华清智言知识库 standard template',
+      weknoraDockerImage: '华清智言知识库 standard image',
       weknoraDockerImageHint: 'Each session gets its own long-lived container. Scripts, shell commands and files all share it until the session ends or the idle timeout reclaims it.',
-      weknoraTemplateOverview: 'WeKnora provides the standard runtime. Templates are discovered after connecting and the standard one is created when missing.',
-      weknoraTemplateDescription: 'Includes the Python, Node.js, CLI tools, workspace path, and non-root execution user expected by WeKnora skills.',
+      weknoraTemplateOverview: '华清智言知识库 provides the standard runtime. Templates are discovered after connecting and the standard one is created when missing.',
+      weknoraTemplateDescription: 'Includes the Python, Node.js, CLI tools, workspace path, and non-root execution user expected by 华清智言知识库 skills.',
       recommendedTag: 'Recommended',
       cardTemplateConfigured: 'Template configured',
       cardCredentialMissing: 'API key missing',
@@ -1185,24 +1185,24 @@ export default {
       refreshTemplates: 'Refresh templates',
       templateSelectHelp: 'Templates are loaded from this cluster. The saved configuration stores the ID automatically.',
       templateSelectPlaceholder: 'Connect to the cluster to load templates',
-      templateLoadHint: 'Enter the cluster connection and refresh. If there is no WeKnora standard template, click Create; after changing DNS or the image, click Delete and rebuild.',
+      templateLoadHint: 'Enter the cluster connection and refresh. If there is no 华清智言知识库 standard template, click Create; after changing DNS or the image, click Delete and rebuild.',
       templateLoadFailed: 'Failed to load templates',
-      standardTemplateProvisioning: 'The WeKnora standard template is being created. Refresh shortly to see its status.',
+      standardTemplateProvisioning: 'The 华清智言知识库 standard template is being created. Refresh shortly to see its status.',
       standardTemplateReplaced: 'The previous standard template was deleted and a rebuild has started. Wait until it is ready.',
       templateNotReady: 'The selected template is not ready. Refresh and wait for the build to finish.',
       connectionPassed: 'Connection verified. Templates below are loaded from this cluster.',
       connectionPassedTitle: 'Cluster connected',
-      templateStepHint: 'This step only lists templates already on the cluster; it does not create one automatically. Click Create WeKnora standard template if none exists, or Delete and rebuild after changing DNS or the image. You can continue after a template is ready.',
+      templateStepHint: 'This step only lists templates already on the cluster; it does not create one automatically. Click Create 华清智言知识库 standard template if none exists, or Delete and rebuild after changing DNS or the image. You can continue after a template is ready.',
       loadingTemplates: 'Loading templates from the cluster...',
       templateBuildingHint: 'The standard template is being built. This list will refresh.',
-      templateUntaggedHint: 'The builds finished but none carries the default tag, so sandbox creation cannot resolve this template. Delete it in E2B and refresh; WeKnora will rebuild it.',
+      templateUntaggedHint: 'The builds finished but none carries the default tag, so sandbox creation cannot resolve this template. Delete it in E2B and refresh; 华清智言知识库 will rebuild it.',
       templateFailedReason: 'Build failed: {reason}',
       noTemplates: 'No templates were returned by this cluster.',
-      weknoraStandardTemplate: 'WeKnora standard template',
+      weknoraStandardTemplate: '华清智言知识库 standard template',
       createStandardTemplate: 'Create',
       createStandardTemplateHint: 'Built with the current connection settings, including DNS. After changing those settings, rebuild from the card.',
       replaceStandardTemplate: 'Rebuild',
-      replaceStandardTemplateConfirm: 'Rebuild the WeKnora standard template with the current settings, including DNS. The previous spawnable template is not deleted until the replacement is ready.',
+      replaceStandardTemplateConfirm: 'Rebuild the 华清智言知识库 standard template with the current settings, including DNS. The previous spawnable template is not deleted until the replacement is ready.',
       templateLockedBySkills: 'This sandbox already has skills. The skill environment is bound to the current snapshot, so the runtime template cannot be changed or rebuilt. Create a new sandbox and install skills from the new template.',
       templateLockedByInFlight: 'A skill is still installing or being removed. The runtime template cannot be changed or rebuilt until that finishes.',
       templateUnnamed: 'Unnamed template',
@@ -1232,7 +1232,7 @@ export default {
       cubeApiKeyOptional: 'Optional — leave empty for an unauthenticated self-hosted CubeSandbox',
       cubeApiKeyWhere: 'How to enable auth on a self-hosted cluster',
       cubeDnsServers: 'DNS servers',
-      cubeDnsServersHelp: 'Optional. Nameserver IPs written into the WeKnora standard template. Leave empty to use the cluster default (commonly 119.29.29.29). If UDP/53 to public resolvers is blocked, use reachable addresses from the Cube host\'s /etc/resolv.conf, excluding 10/8, 172.16/12, and 192.168/16. Existing standard templates take effect only after Rebuild on the template card.',
+      cubeDnsServersHelp: 'Optional. Nameserver IPs written into the 华清智言知识库 standard template. Leave empty to use the cluster default (commonly 119.29.29.29). If UDP/53 to public resolvers is blocked, use reachable addresses from the Cube host\'s /etc/resolv.conf, excluding 10/8, 172.16/12, and 192.168/16. Existing standard templates take effect only after Rebuild on the template card.',
       cubeDnsServersPlaceholder: 'e.g. 8.8.8.8, press Enter to add',
       e2bApiKeyHelp: 'Create one on the API Keys page of the E2B dashboard; it usually starts with e2b_.',
       e2bApiKeyWhere: 'Get an API key from the E2B dashboard',
@@ -1262,9 +1262,9 @@ export default {
       dockerHost: 'Docker daemon endpoint',
       dockerHostHelp: 'Empty follows the local docker CLI (DOCKER_HOST or the current docker context), so you do not have to type /var/run/docker.sock. For a remote daemon use tcp://host:2376, fill in the TLS certificate directory, and turn on "allow private endpoints" for RFC1918 addresses.',
       dockerTlsCertPath: 'TLS certificate directory',
-      dockerTlsCertPathHelp: 'Directory on the WeKnora host holding ca.pem, cert.pem and key.pem. Required for a remote daemon; certificates are mounted by the deployment, never stored here.',
+      dockerTlsCertPathHelp: 'Directory on the 华清智言知识库 host holding ca.pem, cert.pem and key.pem. Required for a remote daemon; certificates are mounted by the deployment, never stored here.',
       dockerIdleTtl: 'Idle reclaim (seconds)',
-      dockerIdleTtlHelp: 'The Docker daemon has no idle timeout of its own. A container that runs no command for this long is reclaimed by WeKnora and rebuilt when the session continues. Empty means 1800 seconds.',
+      dockerIdleTtlHelp: 'The Docker daemon has no idle timeout of its own. A container that runs no command for this long is reclaimed by 华清智言知识库 and rebuilt when the session continues. Empty means 1800 seconds.',
       dockerCpuLimit: 'CPU cores',
       dockerMemoryLimit: 'Memory limit (MB)',
       dockerPidsLimit: 'Process limit',
@@ -1490,37 +1490,37 @@ export default {
     },
     capabilityUnavailable: 'This feature is not supported by the current deployment. You have been returned to an available page.',
     weknoraCloud: {
-      title: 'WeKnora Cloud',
-      description: 'Configure WeKnora Cloud APPID and APPSECRET credentials. Credentials are used for model services and document parsing engine.',
+      title: 'Cloud Service',
+      description: 'Configure Cloud Service APPID and APPSECRET credentials. Credentials are used for model services and document parsing engine.',
       viewDocs: 'View Docs',
       unconfigured: 'Credentials not configured. Please fill in APPID and APPSECRET.',
       configured: 'Credentials configured and working.',
-      expired: 'WeKnora Cloud credentials expired',
+      expired: 'Cloud Service credentials expired',
       expiredDefault: 'Encryption key changed after service restart. Saved credentials cannot be decrypted. Please re-enter credentials.',
       reconfigure: 'Reconfigure',
       appIdLabel: 'APPID',
-      appIdDesc: 'WeKnora Cloud application ID',
+      appIdDesc: 'Cloud Service application ID',
       appIdPlaceholder: 'Enter APPID',
       appSecretLabel: 'APPSECRET',
-      appSecretDesc: 'WeKnora Cloud application secret',
+      appSecretDesc: 'Cloud Service application secret',
       appSecretPlaceholder: 'Enter APPSECRET',
       saveHint: 'Credentials will be validated and encrypted before saving.',
       saveBtn: 'Save Credentials',
       usageTitle: 'Usage Guide',
-      usageSteps: '1. Save APPID and APPSECRET\n2. Register chat, embedding, rerank, and vlm in Cloud Models below\n3. Parser: Knowledge Base Settings → Parser Engine → WeKnora Cloud',
+      usageSteps: '1. Save APPID and APPSECRET\n2. Register chat, embedding, rerank, and vlm in Cloud Models below\n3. Parser: Knowledge Base Settings → Parser Engine → Cloud Service',
       fillRequired: 'Please fill in APPID and APPSECRET',
       saveSuccess: 'Credentials saved successfully',
       saveFailed: 'Failed to save credentials',
-      credentialConfigured: 'WeKnoraCloud credentials configured.',
+      credentialConfigured: 'Cloud Service credentials configured.',
       credentialExpired: 'Credentials expired. Please reconfigure.',
-      credentialUnconfigured: 'WeKnoraCloud credentials not configured. Please set up APPID and APPSECRET first.',
+      credentialUnconfigured: 'Cloud Service credentials not configured. Please set up APPID and APPSECRET first.',
       checkingStatus: 'Checking credential status...',
       goToSettings: 'Go to Settings',
-      modelHintConfigured: 'WeKnoraCloud credentials configured. See supported models in',
+      modelHintConfigured: 'Cloud service credentials configured.',
       modelHintDocsLink: 'API docs',
       modelsSection: {
         title: 'Cloud Models',
-        descReady: 'Register the four standard WeKnora Cloud models for chat, retrieval, reranking, and vision.',
+        descReady: 'Register the four standard Cloud Service models for chat, retrieval, reranking, and vision.',
         descPending: 'Save credentials above before adding cloud models here.',
         statusAdded: 'Added',
         statusPending: 'Credentials required',
@@ -1536,10 +1536,10 @@ export default {
       addModelsFailed: 'Failed to add models',
       addModelsEmbeddingFailed: 'Embedding connection test failed; could not detect vector dimension',
       addModelsDisplayName: {
-        chat: 'WeKnoraCloud Chat',
-        embedding: 'WeKnoraCloud Embedding',
-        rerank: 'WeKnoraCloud ReRank',
-        vllm: 'WeKnoraCloud Vision'
+        chat: 'Cloud Service Chat',
+        embedding: 'Cloud Service Embedding',
+        rerank: 'Cloud Service ReRank',
+        vllm: 'Cloud Service Vision'
       }
     },
     system: 'System Settings',
@@ -1658,8 +1658,8 @@ export default {
       needsConfig: 'Needs Configuration',
       configurable: 'Configurable',
       pathPrefix: 'Path Prefix (optional)',
-      pathPrefixPlaceholder: 'e.g. weknora/images',
-      prefixPlaceholder: 'e.g. weknora',
+      pathPrefixPlaceholder: 'e.g. knowledge/images',
+      prefixPlaceholder: 'e.g. knowledge',
       bucketName: 'Bucket Name',
       bucketPlaceholder: 'Bucket name',
       minioDesc: 'S3-compatible self-hosted object storage, suitable for private networks and private cloud deployment.',
@@ -1925,7 +1925,7 @@ export default {
   },
   envVarSettings: {
     title: 'Sandbox secrets',
-    description: 'Personal keys for skills and sandboxes, not WeKnora system or deployment settings.',
+    description: 'Personal keys for skills and sandboxes, not 华清智言知识库 system or deployment settings.',
     helpAria: 'About sandbox secrets',
     introPersonalTitle: 'Yours only',
     introPersonalBody: 'Injected into your own chats and runs. Other members cannot see them, and theirs will not replace yours.',
@@ -1956,7 +1956,7 @@ export default {
     addRow: 'Add',
     namePlaceholder: 'VARIABLE_NAME',
     nameRule: 'Upper-case letters, digits and underscores, starting with a letter or an underscore.',
-    nameInvalid: 'That name cannot be used. Names the sandbox reserves, such as PATH or anything starting with WEKNORA_, are not accepted.',
+    nameInvalid: 'This name is reserved by the sandbox or uses a system prefix.',
     nameDuplicate: 'You already have a variable with that name here.',
     valuePlaceholder: 'Enter a value',
     storedPlaceholder: 'Stored, type to replace',
@@ -2127,6 +2127,13 @@ export default {
     passwordMismatch: 'Passwords do not match'
   },
   auth: {
+    firstLoginPassword: {
+      loadingPolicy: 'Loading password requirements…',
+      title: 'Set your password',
+      description: 'You are using an initial password. Set a new password that only you know before continuing.',
+      policyError: 'Password requirements could not be loaded. Please retry.',
+      otherAccount: 'Sign out and use another account',
+    },
     login: 'Login',
     logout: 'Logout',
     oidcLogin: 'Sign in with OIDC',
@@ -2147,11 +2154,11 @@ export default {
     haveAccount: 'Already have an account?',
     backToLogin: 'Back to Login',
     loginHint: 'Sign in to continue, or create an account below if this is your first time.',
-    firstTime: 'New to WeKnora?',
+    firstTime: 'Don’t have an account?',
     registerSuccess: 'Registration successful. Please sign in',
     registerFailed: 'Registration failed',
-    subtitle: 'RAG Q&A, ReAct Agent and Wiki — an LLM-powered enterprise knowledge framework',
-    registerSubtitle: 'Create your account and start using WeKnora',
+    subtitle: 'Sign in to your account to explore your knowledge',
+    registerSubtitle: 'Create an account to get started',
     emailPlaceholder: 'Enter email address',
     passwordPlaceholder: 'Enter password',
     confirmPasswordPlaceholder: 'Enter password again',
@@ -2414,7 +2421,7 @@ export default {
     goToAgentSettings: 'Go to agent settings'
   },
   createChat: {
-    title: 'Hi, I am WeKnora — your knowledge, within reach',
+    title: 'Hi, I am 华清智言知识库 — your knowledge, within reach',
     newSessionTitle: 'New Session',
     messages: {
       createFailed: 'Failed to create session',
@@ -2591,10 +2598,10 @@ export default {
     allowFileUpload: 'Show file upload',
     allowFileUploadDesc: 'When enabled, visitors can upload images and document attachments. Requires the bound agent to support image upload.',
     webhookUrl: 'Webhook URL',
-    webhookUrlPlaceholder: 'https://your-server.example.com/weknora/embed-events',
-    webhookUrlDesc: 'Optional. WeKnora POSTs message_sent / message_received events to this HTTPS endpoint.',
+    webhookUrlPlaceholder: 'https://your-server.example.com/knowledge/embed-events',
+    webhookUrlDesc: 'Optional. 华清智言知识库 POSTs message_sent / message_received events to this HTTPS endpoint.',
     webhookSecret: 'Webhook secret',
-    webhookSecretPlaceholder: 'HMAC-SHA256 secret (X-WeKnora-Signature header)',
+    webhookSecretPlaceholder: 'Secret for HMAC-SHA256 signatures',
     webhookSecretKeep: 'Leave blank to keep the saved secret',
     webhookSecretDesc: 'Optional. When set, request bodies are signed for verification on your server.',
     agentWebSearchDisabledHint: 'This agent does not have web search enabled. Visitors will not see the web search button until you enable it in agent settings.',
@@ -3593,9 +3600,9 @@ export default {
     loadingInfo: 'Loading information...',
     retry: 'Retry',
     versionLabel: 'App Version',
-    versionDescription: 'Version of the application service (weknora-app)',
+    versionDescription: 'Version of the application service ',
     frontendVersionLabel: 'UI Version',
-    frontendVersionDescription: 'Build version of the UI (weknora-ui)',
+    frontendVersionDescription: 'Build version of the UI ',
     versionMismatch: 'Mismatch with app version',
     buildTimeLabel: 'Build Time',
     buildTimeDescription: 'Time when the system was built',
@@ -3613,7 +3620,7 @@ export default {
     dbVersionDescription: 'Current database migration version',
     dbMigrationFailedTag: 'Migration failed',
     dbMigrationFailedTitle: 'Database migration failed',
-    dbMigrationFailedDesc: 'The startup database migration did not complete successfully. Some tables or indexes may be missing, which can break Wiki ingest, the knowledge graph, and other features. Check the troubleshooting guide below first; if the issue persists, report it via the link.',
+    dbMigrationFailedDesc: 'The startup database migration did not complete successfully. Missing tables or indexes may affect Wiki, knowledge graph, and other features. Contact your administrator with the error details below.',
     dbMigrationViewDocs: 'View troubleshooting guide',
     dbMigrationReportIssue: 'Can\'t fix it? Report an issue',
     keywordIndexEngineLabel: 'Keyword Index Engine',
@@ -5338,8 +5345,8 @@ export default {
           desc: 'PaddleOCR-VL Cloud API'
         },
         weknoracloud: {
-          name: 'WeKnora Cloud',
-          desc: 'Document parsing via WeKnora Cloud'
+          name: 'Cloud Service',
+          desc: 'Document parsing via Cloud Service'
         },
         markitdown: {
           name: 'MarkItDown',
@@ -6235,7 +6242,7 @@ export default {
       capabilityMessageHistory: 'Message history',
       capabilityMessageHistoryHint: 'Let this key search workspace chat history and read chat-history stats. It does not grant workspace configuration access.',
       capabilityManageModels: 'Manage models',
-      capabilityManageModelsHint: 'Manage model definitions, credentials, connectivity checks, and WeKnoraCloud credentials.',
+      capabilityManageModelsHint: 'Manage model definitions, credentials, connectivity checks, and Cloud Service credentials.',
       capabilityManageMcpServices: 'Manage MCP services',
       capabilityManageMcpServicesHint: 'Manage MCP services, credentials, tool approval policies, and OAuth state for this principal.',
       capabilityManageDatasources: 'Manage data sources',
@@ -6282,14 +6289,14 @@ export default {
       directWarning: 'Direct user ID trusts the caller-supplied header. Use only for trusted server-to-server calls.',
       directWarningDetail: 'Anyone with the API key can change the user ID header to impersonate another external user and reuse or hijack that user\'s MCP OAuth authorization. Do not use this from browsers or untrusted clients; use Signed token for end-user apps.',
       signedRecommended: 'Recommended for user-facing apps: your backend signs a short-lived HS256 JWT for the external user.',
-      signedFlowDetail: 'Keep the HMAC secret only on WeKnora and your trusted backend—never put it in requests or ship it to browsers. The request header carries the JWT string signed with that secret (it changes on each issuance or after expiry), not the secret itself. JWT must include sub (external user ID), tenant_id, aud=weknora, and exp (max 24h lifetime).',
+      signedFlowDetail: 'Keep the HMAC secret only on 华清智言知识库 and your trusted backend—never put it in requests or ship it to browsers. The request header carries the JWT string signed with that secret (it changes on each issuance or after expiry), not the secret itself. JWT must include sub (external user ID), tenant_id, aud=hqzy-knowledge, and exp (max 24h lifetime).',
       directHeader: 'User ID header',
       requireDirectHeader: 'Require user ID header',
       requireDirectHeaderDesc: 'When enabled, API Key requests without the user ID header are rejected; when disabled, all requests are treated as the whole workspace with no per-user distinction.',
       tokenHeader: 'Token header',
       tokenHeaderDesc: 'Clients send the backend-signed JWT in this fixed header.',
       hmacSecret: 'HMAC secret',
-      hmacSecretDesc: 'Same secret stored in WeKnora; used only on your backend to sign JWTs—never send it as a request header.',
+      hmacSecretDesc: 'Same secret stored in 华清智言知识库; used only on your backend to sign JWTs—never send it as a request header.',
       secretConfigured: 'Secret configured (not shown again); enter a new value to rotate',
       secretSavedCopyHint: 'Secret saved. Copy it to your backend now — you will not be able to view it again after leaving this page.',
       generateSecret: 'Generate secret',
@@ -6298,7 +6305,7 @@ export default {
       hmacSecretResetConfirmOk: 'Reset',
       hmacSecretResetConfirmCancel: 'Cancel',
       tokenSignExample: 'Backend JWT signing example (Go)',
-      signedRequestStep0: '# 0. Sign JWT on your backend (HS256, aud=weknora, sub=user id, tenant_id={tenantId}, exp<=24h)',
+      signedRequestStep0: '# 0. Sign JWT on your backend (HS256, aud=hqzy-knowledge, sub=user id, tenant_id={tenantId}, exp<=24h)',
       signedRequestStep0Hint: '#    Put the JWT in {headerName} — not the HMAC secret',
       requestExampleCreateSession: '# 1. Create a session',
       requestExampleAgentChat: '# 2. Agent chat (SSE; replace <session_id> with the id from step 1)',
@@ -6363,7 +6370,7 @@ export default {
     },
     chrome: {
       title: 'Knowledge Assistant',
-      subtitle: 'For self-hosted WeKnora: ask questions in a sidebar, clip web pages, and save Markdown notes into your knowledge bases while you browse.',
+      subtitle: 'For self-hosted 华清智言知识库: ask questions in a sidebar, clip web pages, and save Markdown notes into your knowledge bases while you browse.',
       capabilitiesTitle: 'Core capabilities',
       capabilities: {
         qa: {
@@ -6397,7 +6404,7 @@ export default {
         },
         port: {
           title: 'Desktop: fixed port (recommended)',
-          desc: 'On WeKnora Desktop, set a fixed API port (e.g. 37841) in API Info so the URL stays stable across restarts.'
+          desc: 'On 华清智言知识库 Desktop, set a fixed API port (e.g. 37841) in API Info so the URL stays stable across restarts.'
         },
         install: {
           title: 'Install the extension',
@@ -6416,8 +6423,8 @@ export default {
       storeMeta: 'Chrome Web Store · v1.0.0'
     },
     claw: {
-      title: 'WeKnora Skill',
-      subtitle: 'Import documents and run hybrid retrieval (vector + keyword) via the WeKnora REST API—for uploads, URL imports, Markdown entries, and cross-KB search.',
+      title: '华清智言知识库 Skill',
+      subtitle: 'Import documents and run hybrid retrieval (vector + keyword) via the 华清智言知识库 REST API—for uploads, URL imports, Markdown entries, and cross-KB search.',
       capabilitiesTitle: 'Skill capabilities',
       capabilities: {
         upload: {
@@ -6449,11 +6456,11 @@ export default {
         },
         env: {
           title: 'Configure the API Key',
-          desc: 'Set WEKNORA_API_KEY in the OpenClaw runtime. WEKNORA_BASE_URL is normally no longer required.'
+          desc: 'Follow the bundled instructions to configure the API key in your OpenClaw environment.'
         },
         download: {
           title: 'Download and install the skill',
-          desc: 'Download the ZIP above, extract it, then install the included weknora folder. The skill already contains this API URL.'
+          desc: 'Download the ZIP, extract it, and follow the bundled installation instructions. The API URL is already included.'
         },
         verify: {
           title: 'Verify connection',
@@ -6466,12 +6473,12 @@ export default {
       copyCmdSuccess: 'Install command copied',
       downloadCta: 'Download skill folder',
       downloadCtaHint: 'ZIP includes this API URL · only the API Key is required',
-      downloadSuccess: 'WeKnora Skill download started',
+      downloadSuccess: '华清智言知识库 Skill download started',
       downloadFailed: 'Could not download the skill. Try again later.',
-      ecosystemNote: 'The direct download is based on ClawHub {\'@\'}lyingbug/weknora and embeds this WeKnora API URL. ClawHub remains available for remote installation and version history.',
+      ecosystemNote: 'The download includes this knowledge base API URL. Follow the bundled instructions to install it locally.',
       installCta: 'Open ClawHub',
-      installCtaHint: 'Install WeKnora Skill · opens in a new tab',
-      hubMeta: 'ClawHub · {\'@\'}lyingbug/weknora · MIT-0'
+      installCtaHint: 'Install 华清智言知识库 Skill · opens in a new tab',
+      hubMeta: '华清智言知识库 · Local installation package',
     }
   },
   credential: {

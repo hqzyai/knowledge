@@ -159,17 +159,24 @@ func TestProvisionExternalUserIsIdempotentContributor(t *testing.T) {
 	require.Equal(t, types.ExternalUserInternalID(types.ExternalUserDefaultTenantID, req.UserID), first.ID)
 	require.Equal(t, types.ExternalUserDefaultTenantID, first.TenantID)
 	require.Equal(t, "hermes.user.123@example.com", first.Email)
+	require.True(t, first.Preferences.MustChangePassword)
 
 	member, err := members.GetMembership(context.Background(), first.ID, first.TenantID)
 	require.NoError(t, err)
 	require.NotNil(t, member)
 	require.Equal(t, types.TenantRoleContributor, member.Role)
 
+	// An idempotent provisioning retry must preserve an employee's changed
+	// credential and must not re-enable the first-login restriction.
+	repo.users[first.ID].Preferences.MustChangePassword = false
+	repo.users[first.ID].PasswordHash = "employee-changed-password-hash"
 	second, created, err := svc.ProvisionExternalUser(
 		context.Background(), req, types.ExternalUserDefaultTenantID)
 	require.NoError(t, err)
 	require.False(t, created)
 	require.Equal(t, first.ID, second.ID)
+	require.False(t, second.Preferences.MustChangePassword)
+	require.Equal(t, "employee-changed-password-hash", second.PasswordHash)
 	require.Len(t, repo.users, 1)
 	require.Len(t, members.members, 1)
 }

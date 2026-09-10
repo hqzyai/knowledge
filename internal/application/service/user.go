@@ -321,6 +321,7 @@ func (s *userService) ProvisionExternalUser(
 			PasswordHash: string(hashedPassword),
 			TenantID:     tenantID,
 			IsActive:     true,
+			Preferences:  types.UserPreferences{MustChangePassword: true},
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		}
@@ -831,6 +832,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID, oldPassword, n
 
 	user.PasswordHash = string(hashedPassword)
 	user.UpdatedAt = time.Now()
+	user.Preferences.MustChangePassword = false
 	if user.Preferences.OidcOnlyLogin != nil && *user.Preferences.OidcOnlyLogin {
 		cleared := false
 		user.Preferences.OidcOnlyLogin = &cleared

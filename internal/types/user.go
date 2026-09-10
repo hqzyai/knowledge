@@ -46,6 +46,10 @@ type UserPreferences struct {
 	// UI hides self-service password rotation until the user sets a known
 	// password via ChangePassword (which clears this flag).
 	OidcOnlyLogin *bool `json:"oidc_only_login,omitempty"`
+
+	// MustChangePassword is an authentication restriction, not an editable
+	// preference. External provisioning sets it; only ChangePassword clears it.
+	MustChangePassword bool `json:"must_change_password,omitempty"`
 }
 
 // Value implements driver.Valuer so GORM persists UserPreferences as

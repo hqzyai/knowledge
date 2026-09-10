@@ -11,9 +11,6 @@
       >
         <template #message>
           <div>{{ t('graphSettings.disabledWarning') }}</div>
-          <t-link class="graph-guide-link" theme="primary" @click="handleOpenGraphGuide">
-            {{ t('graphSettings.howToEnable') }}
-          </t-link>
         </template>
       </t-alert>
     </div>
@@ -586,14 +583,6 @@ const loadSystemInfo = async (force = false) => {
   }
 }
 
-const graphGuideUrl =
-  import.meta.env.VITE_KG_GUIDE_URL ||
-  'https://github.com/Tencent/WeKnora/blob/main/docs/KnowledgeGraph.md'
-
-// Open guide documentation to show how to enable graph database
-const handleOpenGraphGuide = () => {
-  window.open(graphGuideUrl, '_blank', 'noopener')
-}
 
 // 初始化
 onMounted(async () => {

@@ -183,7 +183,7 @@ const basicTextSample = `这是一段普通文本，包含 **加粗**、*斜体*
 
 也可以包含快捷键样式：<kbd>⌘</kbd> + <kbd>K</kbd>。
 
-这里有一个链接：[GitHub](https://github.com)。
+这里有一个链接：[示例链接](https://example.com)。
 
 > 一级引用
 >

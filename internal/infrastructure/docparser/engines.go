@@ -164,7 +164,7 @@ func (e *weKnoraCloudEngine) CheckAvailable(_ bool, overrides map[string]string)
 	if overrides["weknoracloud_app_id"] != "" {
 		return true, ""
 	}
-	return false, "WeKnora Cloud credentials not configured. Go to Settings → WeKnora Cloud to set up."
+	return false, "Cloud service credentials are not configured. Please contact your administrator."
 }
 
 func (e *weKnoraCloudEngine) NewReader(

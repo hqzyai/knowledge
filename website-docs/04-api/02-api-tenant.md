@@ -125,6 +125,12 @@ curl -X PUT $BASE/api/v1/tenants/kv/web-search-config -H "Authorization: Bearer 
 
 ### POST /api/v1/external-users
 
+新创建的外部用户带有服务端标记 `user.preferences.must_change_password=true`。
+首次网页登录后须先修改初始密码；修改前 JWT 只能访问身份查询、改密和退出接口，
+业务接口返回 HTTP 403、`code=PASSWORD_CHANGE_REQUIRED`。改密成功会清除此标记并撤销
+全部登录会话，用户须使用新密码重新登录。API Key 集成调用不受此网页登录限制影响。
+对同一用户的幂等开户重试不会覆盖其密码或重新启用改密限制。
+
 用途：供 Hermes 等受信任系统同步创建用户。用户固定加入空间 `10000`，角色为 `contributor`（界面显示“编辑”）；`user_id` 同时作为 `/conversation-sync` 的外部用户 ID，使每日对话知识库归属该用户。接口返回一个能力授权 API Key：仅具有 `chat`、`retrieve`、`read_agents`，知识库权限为“预绑定的个人 Hermes 对话知识库 + 同空间 `visibility=workspace` 的公开知识库（动态只读）”。
 
 权限：空间 `10000` 的 Owner JWT，或该空间已有的 Full Access API Key。接口不会接受其它空间的凭证。

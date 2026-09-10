@@ -9,7 +9,7 @@
 //
 //   - Session-sandbox capability: registration is feature-gated on the
 //     sandbox backend exposing SandboxCommandExecutor (Cube, E2B, Docker).
-//     shell_exec never runs on the WeKnora host.
+//     shell_exec never runs on the knowledge base host.
 //   - Session-scoped: the sandbox is resolved from ToolExecContext.SessionID
 //     so the LLM cannot execute against a foreign session, and installed
 //     dependencies persist across subsequent tool calls in the same session.
@@ -242,7 +242,7 @@ var shellExecTool = BaseTool{
   are refused up-front. Cleaning up your own scratch dir (e.g.
   ` + "`rm -rf /workspace/tmp`" + `) is fine.
 - Only available when the session sandbox advertises a command executor
-  (Cube, E2B, Docker). The command never runs on the WeKnora host.`,
+  (Cube, E2B, Docker). The command never runs on the knowledge base host.`,
 	schema: utils.GenerateSchema[ShellExecInput](),
 }
 

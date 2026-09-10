@@ -101,6 +101,8 @@ export interface UserPreferences {
   last_active_tenant_id?: number | null
   // oidc_only_login 为 true 表示账号由 OIDC 自动开通且用户尚未设置已知密码。
   oidc_only_login?: boolean
+  // Server-owned restriction; cannot be cleared through the preferences API.
+  must_change_password?: boolean
 }
 
 // 用户信息接口

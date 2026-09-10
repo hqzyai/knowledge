@@ -405,11 +405,7 @@ const CONFIGURABLE_ENGINES = new Set(['mineru', 'mineru_cloud', 'paddleocr_vl', 
 
 /** 各解析引擎的项目/官方文档地址 */
 const ENGINE_DOC_LINKS: Record<string, string> = {
-  weknoracloud: 'https://developers.weixin.qq.com/doc/aispeech/knowledge/atomic_capability/atomic_interface.html',
-  markitdown: 'https://github.com/microsoft/markitdown',
-  mineru: 'https://github.com/opendatalab/MinerU',
   mineru_cloud: 'https://mineru.net/apiManage/docs',
-  paddleocr_vl: 'https://github.com/PaddlePaddle/PaddleOCR',
   paddleocr_vl_cloud: 'https://aistudio.baidu.com/paddleocr',
 }
 

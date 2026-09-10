@@ -45,6 +45,19 @@ test('locale bundles expose the same translation keys', () => {
   assert.deepEqual(mismatches, [], mismatches.slice(0, 20).join('\n'))
 })
 
+test('product messages do not expose upstream branding in any locale', () => {
+  const failures: string[] = []
+  for (const [locale, bundle] of Object.entries(LOCALE_BUNDLES)) {
+    for (const key of collectLocaleKeys(bundle)) {
+      const message = getLocaleValueAtPath(bundle, key)
+      if (typeof message === 'string' && /weknora/i.test(message)) {
+        failures.push(`${locale}: ${key}`)
+      }
+    }
+  }
+  assert.deepEqual(failures, [])
+})
+
 test('critical runtime i18n trees are present', () => {
   const en = localeKeysByName['en-US']
   const missing = CRITICAL_LOCALE_KEYS.filter((key) => !en.has(key))

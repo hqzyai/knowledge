@@ -78,6 +78,39 @@ func TestResolveAPIPrincipalSignedToken(t *testing.T) {
 	}
 }
 
+func TestExternalUserJWTAudiences(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		audience interface{}
+		valid    bool
+	}{
+		{"product", "hqzy-knowledge", true},
+		{"legacy", "weknora", true},
+		{"unrelated", "another-service", false},
+		{"missing", nil, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := jwt.MapClaims{
+				"sub":       "external-u1",
+				"tenant_id": "7",
+				"exp":       time.Now().Add(time.Minute).Unix(),
+			}
+			if tc.audience != nil {
+				claims["aud"] = tc.audience
+			}
+			token := signedExternalUserToken(t, "test-secret", claims)
+			id, err := verifyExternalUserJWT(token, 7, "test-secret")
+			if tc.valid {
+				if err != nil || id != "external-u1" {
+					t.Fatalf("verifyExternalUserJWT = (%q, %v)", id, err)
+				}
+			} else if err == nil {
+				t.Fatal("expected invalid audience to be rejected")
+			}
+		})
+	}
+}
+
 func TestResolveAPIPrincipalSignedTokenRejectsWrongTenant(t *testing.T) {
 	secret := "test-secret"
 	header := http.Header{}

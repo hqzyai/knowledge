@@ -1737,7 +1737,7 @@ func buildInstallPrompt(skillDir string, bundle *SkillBundle, tools map[string]s
 		skillMD = string(bundle.Files["SKILL.md"])
 		requirementsPath = sandbox.SkillRequirementsPath(bundle.Name)
 	}
-	return fmt.Sprintf(`Install this WeKnora skill into the sandbox image.
+	return fmt.Sprintf(`Install this knowledge base skill into the sandbox image.
 
 Skill directory: %s
 %s

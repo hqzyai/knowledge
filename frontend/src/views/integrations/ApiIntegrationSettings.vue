@@ -75,18 +75,6 @@
           </div>
         </template>
 
-        <div class="row row--doc">
-          <div class="row-info">
-            <label>{{ $t('tenant.api.docLabel') }}</label>
-            <p>
-              {{ $t('tenant.api.docDescription') }}
-              <a class="doc-link" @click="openApiDoc">
-                {{ $t('tenant.api.openDoc') }}
-                <t-icon name="link" class="link-icon" />
-              </a>
-            </p>
-          </div>
-        </div>
 
         <div class="api-key-section">
           <div class="api-key-section__header">
@@ -1066,14 +1054,14 @@ func signExternalUserToken(hmacSecret, externalUserID string, tenantID uint64) (
 	claims := jwt.MapClaims{
 		"sub":       externalUserID, // e.g. "user_123"
 		"tenant_id": float64(tenantID),
-		"aud":       "weknora",
+		"aud":       "hqzy-knowledge",
 		"exp":       time.Now().Add(time.Hour).Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).
 		SignedString([]byte(hmacSecret))
 }
 
-// Send on each WeKnora API request:
+// Send on each knowledge base API request:
 //   ${headerName}: <JWT from signExternalUserToken>
 // Tenant ID for this workspace: ${tid}`
 })
@@ -1430,9 +1418,6 @@ const saveDesktopPort = async () => {
   }
 }
 
-function openApiDoc() {
-  window.open('https://github.com/Tencent/WeKnora/blob/main/docs/api/README.md', '_blank')
-}
 
 function openCreateAPIKeyDialog() {
   apiKeyForm.name = ''
