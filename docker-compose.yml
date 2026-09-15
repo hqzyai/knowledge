@@ -70,6 +70,7 @@ services:
     env_file:
       - .env
     environment:
+      AGENTOS_CONSOLE_PUBLIC_KEY: ${AGENTOS_CONSOLE_PUBLIC_KEY:-}
       # ========== 日志 ==========
       # 日志级别，默认debug
       - LOG_LEVEL=${LOG_LEVEL:-debug}

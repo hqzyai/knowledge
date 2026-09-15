@@ -21,6 +21,7 @@ services:
     env_file:
       - .env
     environment:
+      AGENTOS_CONSOLE_PUBLIC_KEY: ${AGENTOS_CONSOLE_PUBLIC_KEY:-}
       # .env 中的 15432 是宿主机映射端口；容器间通过 PostgreSQL 内部端口通信。
       DB_HOST: postgres
       DB_PORT: "5432"

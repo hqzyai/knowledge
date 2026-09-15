@@ -131,6 +131,10 @@ func Auth(
 	cfg *config.Config,
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.GetBool(consoleAuthenticated) {
+			c.Next()
+			return
+		}
 		// ignore OPTIONS request
 		if c.Request.Method == http.MethodOptions {
 			c.Next()

@@ -12,6 +12,7 @@ services:
       - path: .env.cloud
         required: false
     environment:
+      AGENTOS_CONSOLE_PUBLIC_KEY: ${AGENTOS_CONSOLE_PUBLIC_KEY:-}
       # This deployment uses Elasticsearch for vector retrieval and does not
       # enable DuckDB's optional CSV/Excel data-analysis extensions.
       DUCKDB_SKIP_EXTENSION_LOAD: "1"

@@ -177,6 +177,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 	serveResourceGrants(r, params.ResourceCatalog, params.TenantService, params.FileService, params.StorageBackendResolver)
 
 	// 认证中间件
+	r.Use(middleware.AgentOSConsoleAuth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.RedisClient, params.Config))
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))
 
 	// 文件服务：统一代理本地/MinIO/COS/TOS存储后端（需要认证）
