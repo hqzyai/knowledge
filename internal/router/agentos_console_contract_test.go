@@ -24,6 +24,8 @@ func TestAgentOSConsoleRoutesResolveToRegisteredHandlers(t *testing.T) {
 	RegisterWikiPageRoutes(r, &handler.WikiPageHandler{}, g)
 	RegisterChunkerDebugRoutes(r, g)
 	RegisterInitializationRoutes(r, &handler.InitializationHandler{}, g)
+	RegisterTenantRoutes(r, &handler.TenantHandler{}, &handler.TenantMemberHandler{}, &handler.TenantInvitationHandler{}, &handler.AuditLogHandler{}, g)
+	RegisterSystemRoutes(r, &handler.SystemHandler{}, g)
 	RegisterOrganizationRoutes(r, &handler.OrganizationHandler{}, g)
 	RegisterModelRoutes(r, &handler.ModelHandler{}, &handler.ModelCredentialsHandler{}, g)
 	RegisterVectorStoreRoutes(r, &handler.VectorStoreHandler{}, g)

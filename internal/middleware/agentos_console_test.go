@@ -96,6 +96,9 @@ func TestAgentOSConsoleRequestBoundUserAuthorization(t *testing.T) {
 	engine.GET("/api/v1/knowledgebase/:kb_id/wiki/stats", RequireKBAccess(KBIDFromParam("kb_id"), types.OrgRoleViewer, sharedLookup, sharedGrant, nil, cfg), func(c *gin.Context) { c.Status(200) })
 	engine.POST("/api/v1/knowledgebase/:kb_id/wiki/auto-fix", RequireKBAccess(KBIDFromParam("kb_id"), types.OrgRoleEditor, sharedLookup, sharedGrant, nil, cfg), func(c *gin.Context) { c.Status(201) })
 	engine.POST("/api/v1/system/admin/users", func(c *gin.Context) { c.Status(201) })
+	engine.GET("/api/v1/tenants/kv/:key", func(c *gin.Context) { c.Status(200) })
+	engine.GET("/api/v1/system/parser-engines", func(c *gin.Context) { c.Status(200) })
+	engine.POST("/api/v1/initialization/extract/text-relation", RequireRole(types.TenantRoleAdmin, cfg), func(c *gin.Context) { c.Status(200) })
 	digest := func(v string) string { d := sha256.Sum256([]byte(v)); return hex.EncodeToString(d[:]) }
 	claims := func() jwt.MapClaims {
 		return jwt.MapClaims{"iss": "agentos-console", "aud": "weknora-console", "sub": "employee-1", "iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(), "jti": "unique-request-identifier-12345", "method": "POST", "target": "/api/v1/knowledge-bases", "digest": digest(`{"name":"Test"}`), "key_digest": digest("user-api-key")}
@@ -116,6 +119,34 @@ func TestAgentOSConsoleRequestBoundUserAuthorization(t *testing.T) {
 		response := httptest.NewRecorder()
 		engine.ServeHTTP(response, request)
 		require.Equal(t, 403, response.Code)
+	})
+	t.Run("only the storage default KV is delegated", func(t *testing.T) {
+		for _, key := range []string{"storage-engine-config", "parser-engine-config", "other-secret"} {
+			c := claims()
+			c["method"] = "GET"
+			c["target"] = "/api/v1/tenants/kv/" + key
+			c["jti"] = "editor-kv-unique-request-" + key
+			expected := 403
+			if key == "storage-engine-config" {
+				expected = 200
+			}
+			require.Equal(t, expected, call(c, c["target"].(string), `{"name":"Test"}`))
+		}
+	})
+	t.Run("editor capabilities retain real role guards", func(t *testing.T) {
+		c := claims()
+		c["method"] = "GET"
+		c["target"] = "/api/v1/system/parser-engines"
+		c["jti"] = "editor-parser-unique-request-12345"
+		require.Equal(t, 200, call(c, c["target"].(string), `{"name":"Test"}`))
+		c["method"] = "POST"
+		c["target"] = "/api/v1/initialization/extract/text-relation"
+		c["jti"] = "editor-graph-contributor-request-12345"
+		require.Equal(t, 403, call(c, c["target"].(string), `{"name":"Test"}`))
+		members.seedActive(userID, 10000, types.TenantRoleAdmin)
+		c["jti"] = "editor-graph-admin-request-12345"
+		require.Equal(t, 200, call(c, c["target"].(string), `{"name":"Test"}`))
+		members.seedActive(userID, 10000, types.TenantRoleContributor)
 	})
 	t.Run("signature cannot change payload", func(t *testing.T) {
 		require.Equal(t, 401, call(claims(), "/api/v1/knowledge-bases", `{"name":"Forged"}`))

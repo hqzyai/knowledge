@@ -56,7 +56,7 @@ func AgentOSConsoleAuth(tenants interfaces.TenantService, users interfaces.UserS
 			reject(503, "AgentOS console bridge is not configured")
 			return
 		}
-		if len(assertion) > 8192 || !consoleRouteAllowed(c.Request.Method, c.FullPath()) || c.GetHeader("X-Tenant-ID") != "" || c.GetHeader("Authorization") != "" {
+		if len(assertion) > 8192 || !consoleRouteAllowed(c.Request.Method, c.FullPath()) || c.GetHeader("X-Tenant-ID") != "" || c.GetHeader("Authorization") != "" || (c.FullPath() == "/api/v1/tenants/kv/:key" && c.Param("key") != "storage-engine-config") {
 			reject(403, "Console operation is not allowed")
 			return
 		}
@@ -148,6 +148,14 @@ func buildConsoleRoutes() [][2]string {
 	routes := [][2]string{}
 	add := func(methods, path string) { routes = append(routes, [2]string{methods, "/api/v1/" + path}) }
 	add("GET", "auth/me")
+	// Creation-time metadata only; the concrete KV key is checked above.
+	add("GET", "tenants/kv/:key")
+	for _, name := range []string{"info", "parser-engines", "storage-engine-status"} {
+		add("GET", "system/"+name)
+	}
+	for _, name := range []string{"fabri-tag", "fabri-text", "text-relation"} {
+		add("POST", "initialization/extract/"+name)
+	}
 	add("GET POST", "user/favorites")
 	add("DELETE", "user/favorites/:type/:id")
 	add("PUT", "initialization/config/:kbId")
