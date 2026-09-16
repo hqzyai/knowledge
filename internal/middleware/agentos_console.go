@@ -236,6 +236,21 @@ func buildConsoleRoutes() [][2]string {
 	add("GET", "organizations/:id/shared-knowledge-bases")
 	add("POST", "knowledge-search")
 	add("POST", "chunker/preview")
+	// Knowledge settings use the caller's existing workspace RBAC. This does
+	// not grant these capabilities to the API key outside the signed bridge.
+	add("GET POST", "datasource")
+	add("GET", "datasource/types")
+	add("POST", "datasource/validate-credentials")
+	add("GET PUT DELETE", "datasource/:id")
+	add("PUT", "datasource/:id/credentials")
+	add("DELETE", "datasource/:id/credentials/:field")
+	for _, name := range []string{"resources", "logs"} {
+		add("GET", "datasource/:id/"+name)
+	}
+	add("GET", "datasource/logs/:log_id")
+	for _, name := range []string{"validate", "resource-ancestors", "sync", "pause", "resume"} {
+		add("POST", "datasource/:id/"+name)
+	}
 	return routes
 }
 

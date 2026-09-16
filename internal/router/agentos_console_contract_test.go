@@ -31,6 +31,7 @@ func TestAgentOSConsoleRoutesResolveToRegisteredHandlers(t *testing.T) {
 	RegisterVectorStoreRoutes(r, &handler.VectorStoreHandler{}, g)
 	RegisterStorageBackendRoutes(r, &handler.StorageBackendHandler{}, g)
 	RegisterChatRoutes(r, &sessionhandler.Handler{}, g)
+	RegisterDataSourceRoutes(r, &handler.DataSourceHandler{}, &handler.DataSourceCredentialsHandler{}, g)
 	serveKBScopedFiles(r, g, nil, nil, nil)
 	// Auth registration also exposes public login/OIDC routes; only this already
 	// existing session projection is in the bridge's allow-list.

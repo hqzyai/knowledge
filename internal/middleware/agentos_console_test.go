@@ -99,6 +99,9 @@ func TestAgentOSConsoleRequestBoundUserAuthorization(t *testing.T) {
 	engine.GET("/api/v1/tenants/kv/:key", func(c *gin.Context) { c.Status(200) })
 	engine.GET("/api/v1/system/parser-engines", func(c *gin.Context) { c.Status(200) })
 	engine.POST("/api/v1/initialization/extract/text-relation", RequireRole(types.TenantRoleAdmin, cfg), func(c *gin.Context) { c.Status(200) })
+	policy.Register("POST", "/api/v1/datasource", APIKeyRoutePolicy{RequireFullAccess: true})
+	engine.POST("/api/v1/datasource", RequireRole(types.TenantRoleAdmin, cfg), func(c *gin.Context) { c.Status(201) })
+	engine.GET("/api/v1/datasource", RequireRole(types.TenantRoleViewer, cfg), func(c *gin.Context) { c.Status(200) })
 	digest := func(v string) string { d := sha256.Sum256([]byte(v)); return hex.EncodeToString(d[:]) }
 	claims := func() jwt.MapClaims {
 		return jwt.MapClaims{"iss": "agentos-console", "aud": "weknora-console", "sub": "employee-1", "iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(), "jti": "unique-request-identifier-12345", "method": "POST", "target": "/api/v1/knowledge-bases", "digest": digest(`{"name":"Test"}`), "key_digest": digest("user-api-key")}
@@ -148,6 +151,26 @@ func TestAgentOSConsoleRequestBoundUserAuthorization(t *testing.T) {
 		require.Equal(t, 200, call(c, c["target"].(string), `{"name":"Test"}`))
 		members.seedActive(userID, 10000, types.TenantRoleContributor)
 	})
+	t.Run("datasource delegation preserves role requirements and machine key restrictions", func(t *testing.T) {
+		c := claims()
+		c["target"] = "/api/v1/datasource"
+		c["method"] = "GET"
+		c["jti"] = "datasource-read-contributor-request"
+		require.Equal(t, 200, call(c, c["target"].(string), `{"name":"Test"}`))
+		c["method"] = "POST"
+		c["jti"] = "datasource-write-contributor-request"
+		require.Equal(t, 403, call(c, c["target"].(string), `{"name":"Test"}`))
+		members.seedActive(userID, 10000, types.TenantRoleAdmin)
+		c["jti"] = "datasource-write-admin-request"
+		require.Equal(t, 201, call(c, c["target"].(string), `{"name":"Test"}`))
+		request := httptest.NewRequest("POST", "/api/v1/datasource", strings.NewReader(`{"name":"Denied"}`))
+		request.Header.Set("X-API-Key", "user-api-key")
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, request)
+		require.Equal(t, 403, response.Code)
+		members.seedActive(userID, 10000, types.TenantRoleContributor)
+	})
+
 	t.Run("signature cannot change payload", func(t *testing.T) {
 		require.Equal(t, 401, call(claims(), "/api/v1/knowledge-bases", `{"name":"Forged"}`))
 	})
