@@ -393,6 +393,11 @@ func (t *KnowledgeSearchTool) Execute(ctx context.Context, args json.RawMessage)
 		return result, err
 	}
 	logger.Infof(ctx, "[Tool][KnowledgeSearch] Output: %s", result.Output)
+	recalled := make([]*types.SearchResult, 0, len(deduplicatedResults))
+	for _, row := range deduplicatedResults {
+		recalled = append(recalled, row.SearchResult)
+	}
+	types.RecordSearchRecall(ctx, recalled)
 	return result, nil
 }
 

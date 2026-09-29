@@ -367,6 +367,7 @@ func (h *KnowledgeBaseHandler) HybridSearch(c *gin.Context) {
 
 	logger.Infof(ctx, "Hybrid search completed, knowledge base ID: %s, result count: %d",
 		secutils.SanitizeForLog(id), len(results))
+	types.RecordSearchRecall(ctx, results)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    rewriter.CopyReferences(ctx, results),

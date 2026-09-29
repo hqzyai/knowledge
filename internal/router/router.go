@@ -13,12 +13,14 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/dig"
 
+	"github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/handler"
 	"github.com/Tencent/WeKnora/internal/handler/session"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
+	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 
 	_ "github.com/Tencent/WeKnora/docs" // swagger docs
@@ -88,6 +90,8 @@ type RouterParams struct {
 	WeKnoraCloudHandler          *handler.WeKnoraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
 	MemoryHandler                *handler.MemoryHandler
+	KnowledgeUsageHandler        *handler.KnowledgeUsageHandler       `optional:"true"`
+	KnowledgeUsageRepository     *repository.KnowledgeUsageRepository `optional:"true"`
 }
 
 // NewRouter 创建新的路由
@@ -179,6 +183,15 @@ func NewRouter(params RouterParams) *gin.Engine {
 	// 认证中间件
 	r.Use(middleware.AgentOSConsoleAuth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.RedisClient, params.Config))
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))
+	if params.KnowledgeUsageRepository != nil {
+		r.Use(func(c *gin.Context) {
+			c.Request = c.Request.WithContext(types.WithRecallRecorder(c.Request.Context(), params.KnowledgeUsageRepository))
+			c.Next()
+		})
+	}
+	if params.KnowledgeUsageHandler != nil {
+		r.GET("/api/v1/knowledge-analytics", params.KnowledgeUsageHandler.Read)
+	}
 
 	// 文件服务：统一代理本地/MinIO/COS/TOS存储后端（需要认证）
 	serveFilesWithResources(r, params.FileService, params.StorageBackendResolver, params.ResourceCatalog)

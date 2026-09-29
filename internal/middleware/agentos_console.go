@@ -19,10 +19,12 @@ import (
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
 const consoleAuthenticated = "agentos_console_authenticated"
+const AgentOSObserverContext = "agentos_readonly_observer"
 const consoleMaxBody = 128 << 20
 
 type consoleClaims struct {
@@ -32,6 +34,8 @@ type consoleClaims struct {
 	Target      string `json:"target"`
 	Digest      string `json:"digest"`
 	KeyDigest   string `json:"key_digest"`
+	Scope       string `json:"scope"`
+	Role        string `json:"role"`
 }
 
 // AgentOSConsoleAuth only handles signed console requests. Requests without
@@ -86,6 +90,34 @@ func AgentOSConsoleAuth(tenants interfaces.TenantService, users interfaces.UserS
 		}
 		c.Request.Body = io.NopCloser(bytes.NewReader(body))
 		ctx := c.Request.Context()
+		if claims.Scope != "" || claims.Role != "" {
+			// A cryptographically bound virtual observer has no employee API key,
+			// password, runtime, or workspace management role. It can reach only
+			// this exact read endpoint; normal console handlers remain forbidden.
+			if claims.Scope != "knowledge-analytics:read" || claims.Role != "system_admin" || c.Request.Method != "GET" || c.FullPath() != "/api/v1/knowledge-analytics" || apiKey != "" || len(body) != 0 {
+				reject(403, "Observer operation is not allowed")
+				return
+			}
+			tenant, err := tenants.GetTenantByID(ctx, types.ExternalUserDefaultTenantID)
+			if err != nil || tenant == nil || tenant.Status != "active" {
+				reject(403, "Observer workspace is unavailable")
+				return
+			}
+			consumed, err := nonces.SetNX(ctx, "agentos-console:nonce:"+claims.ID, "1", 2*time.Minute).Result()
+			if err != nil {
+				reject(503, "Console replay protection is unavailable")
+				return
+			}
+			if !consumed {
+				reject(401, "Console assertion already used")
+				return
+			}
+			id := uuid.NewSHA1(uuid.NameSpaceURL, []byte("weknora:agentos-observer:v1:"+claims.Subject)).String()
+			c.Set(AgentOSObserverContext, gin.H{"id": id, "external_id": claims.Subject, "role": "viewer"})
+			c.Set(consoleAuthenticated, true)
+			c.Next()
+			return
+		}
 		key, err := keys.AuthenticateAPIKey(ctx, apiKey)
 		tenantID := types.ExternalUserDefaultTenantID
 		userID := types.ExternalUserInternalID(tenantID, claims.Subject)
@@ -134,6 +166,9 @@ func validConsoleRole(role types.TenantRole) bool {
 // Match registered route templates, not prefixes: future admin endpoints are
 // denied unless deliberately added. The existing handlers still enforce RBAC.
 func consoleRouteAllowed(method, path string) bool {
+	if method == "GET" && path == "/api/v1/knowledge-analytics" {
+		return true
+	}
 	for _, rule := range consoleRoutes {
 		if strings.Contains(" "+rule[0]+" ", " "+method+" ") && rule[1] == path {
 			return true

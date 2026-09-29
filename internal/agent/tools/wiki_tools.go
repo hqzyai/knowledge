@@ -852,6 +852,7 @@ func (t *wikiSearchTool) Execute(ctx context.Context, args json.RawMessage) (*ty
 	}
 
 	var allOutputs []string
+	var recallHits []types.RecallHit
 	var searchErrors []string
 	successfulSearchCalls := 0
 	// Per-slug list of KB IDs that produced a match. Multiple KBs may share a
@@ -904,6 +905,7 @@ func (t *wikiSearchTool) Execute(ctx context.Context, args json.RawMessage) (*ty
 					continue
 				}
 				actualKBID := kbID
+				recallHits = append(recallHits, types.RecallHit{KnowledgeBaseID: kbID, ResourceID: p.ID, Kind: "wiki"})
 				allHits = append(allHits, searchHit{page: p, kbID: actualKBID})
 				t.routes.rememberPage(p, actualKBID)
 				foundKBs[p.Slug] = append(foundKBs[p.Slug], actualKBID)
@@ -957,6 +959,7 @@ func (t *wikiSearchTool) Execute(ctx context.Context, args json.RawMessage) (*ty
 		return &types.ToolResult{Success: false, Error: strings.Join(searchErrors, "; ")}, nil
 	}
 	output := strings.Join(allOutputs, "\n\n")
+	types.RecordRecall(ctx, recallHits)
 	if len(searchErrors) > 0 {
 		output += "\n\n<errors>\n" + strings.Join(searchErrors, "\n") + "\n</errors>"
 	}

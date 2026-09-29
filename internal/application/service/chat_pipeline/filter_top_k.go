@@ -67,7 +67,18 @@ func (p *PluginFilterTopK) OnEvent(ctx context.Context,
 		"rerank_cnt": len(chatManage.RerankResult),
 		"search_cnt": len(chatManage.SearchResult),
 	})
-	return next()
+	if err := next(); err != nil {
+		return err
+	}
+	results := chatManage.MergeResult
+	if len(results) == 0 {
+		results = chatManage.RerankResult
+	}
+	if len(results) == 0 {
+		results = chatManage.SearchResult
+	}
+	types.RecordSearchRecall(ctx, results)
+	return nil
 }
 
 // sortSearchResultsDeterministically restores the global relevance order after

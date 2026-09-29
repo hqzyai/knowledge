@@ -40,6 +40,7 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// Per-API-key operation and KB scopes: a restriction, so dropping it would
 	// hand background work broader reach than the key it came from.
 	TenantAPIKeyScopeContextKey: true,
+	RecallRecorderContextKey:    true,
 
 	// A request-scoped chat model is supplied by a machine caller for this one
 	// QA turn. The handler deliberately detaches the SSE worker from the HTTP

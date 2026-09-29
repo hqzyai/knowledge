@@ -1012,6 +1012,13 @@ func (h *WikiPageHandler) SearchPages(c *gin.Context) {
 		return
 	}
 
+	hits := make([]types.RecallHit, 0, len(pages))
+	for _, page := range pages {
+		if page != nil {
+			hits = append(hits, types.RecallHit{KnowledgeBaseID: kbID, ResourceID: page.ID, Kind: "wiki"})
+		}
+	}
+	types.RecordRecall(c.Request.Context(), hits)
 	c.JSON(http.StatusOK, gin.H{"pages": pages})
 }
 
