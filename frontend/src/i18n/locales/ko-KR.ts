@@ -4549,6 +4549,8 @@ export default {
       loadingPolicy: '비밀번호 규칙을 불러오는 중…',
       title: '비밀번호 설정',
       description: '초기 비밀번호를 사용하고 있습니다. 계속하려면 본인만 아는 새 비밀번호를 설정해 주세요.',
+      initialPasswordLabel: '초기 비밀번호',
+      initialPasswordHint: '현재 비밀번호가 자동으로 입력되었습니다. 새 비밀번호를 설정해 주세요.',
       policyError: '비밀번호 규칙을 불러오지 못했습니다. 다시 시도해 주세요.',
       otherAccount: '로그아웃하고 다른 계정 사용',
     },

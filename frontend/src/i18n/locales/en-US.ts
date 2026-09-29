@@ -2131,6 +2131,8 @@ export default {
       loadingPolicy: 'Loading password requirements…',
       title: 'Set your password',
       description: 'You are using an initial password. Set a new password that only you know before continuing.',
+      initialPasswordLabel: 'Initial password',
+      initialPasswordHint: 'Your current password has been filled in. Please set a new password.',
       policyError: 'Password requirements could not be loaded. Please retry.',
       otherAccount: 'Sign out and use another account',
     },

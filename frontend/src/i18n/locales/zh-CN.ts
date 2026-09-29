@@ -4551,6 +4551,8 @@ export default {
       loadingPolicy: '正在加载密码规则…',
       title: '设置您的登录密码',
       description: '您正在使用初始密码。请先设置一个仅您知道的新密码，完成后即可继续使用。',
+      initialPasswordLabel: '初始密码',
+      initialPasswordHint: '当前密码已自动填入，请设置新密码。',
       policyError: '暂时无法获取密码规则，请重试。',
       otherAccount: '退出并使用其他账号',
     },

@@ -16,15 +16,21 @@
         <button type="button" class="text-link" @click="loadPolicy">{{ t('auth.workspaceOnboarding.retry') }}</button>
       </div>
 
+      <aside class="initial-password invite-banner" aria-labelledby="initial-password-label">
+        <p id="initial-password-label" class="invite-title">{{ t('auth.firstLoginPassword.initialPasswordLabel') }}</p>
+        <code class="initial-password-value">{{ INITIAL_PASSWORD }}</code>
+        <p>{{ t('auth.firstLoginPassword.initialPasswordHint') }}</p>
+      </aside>
+
       <t-form ref="formRef" :data="form" :rules="rules" layout="vertical" label-align="top"
         :required-mark="false" class="auth-form" @submit="submit">
         <t-form-item name="oldPassword" :label="t('userProfile.changePassword.currentLabel')" for="current-password">
           <t-input v-input-id="'current-password'" v-model="form.oldPassword" type="password" autocomplete="current-password"
-            :disabled="submitting" :placeholder="t('userProfile.changePassword.currentPlaceholder')" autofocus />
+            :disabled="submitting" :placeholder="t('userProfile.changePassword.currentPlaceholder')" />
         </t-form-item>
         <t-form-item name="newPassword" :label="t('userProfile.changePassword.newLabel')" for="new-password">
           <t-input v-input-id="'new-password'" v-model="form.newPassword" type="password" autocomplete="new-password"
-            :disabled="submitting" :placeholder="t('userProfile.changePassword.newPlaceholder')" />
+            :disabled="submitting" :placeholder="t('userProfile.changePassword.newPlaceholder')" autofocus />
         </t-form-item>
         <t-form-item name="confirmPassword" :label="t('userProfile.changePassword.confirmLabel')" for="confirm-password">
           <t-input v-input-id="'confirm-password'" v-model="form.confirmPassword" type="password" autocomplete="new-password"
@@ -60,7 +66,10 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const formRef = ref<FormInstanceFunctions | null>(null)
-const form = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+// Shared temporary credential configured by AgentOS WEKNORA_INITIAL_PASSWORD.
+// This page is restricted to accounts that must rotate their initial password.
+const INITIAL_PASSWORD = 'Hqzy@2026!'
+const form = reactive({ oldPassword: INITIAL_PASSWORD, newPassword: '', confirmPassword: '' })
 const submitting = ref(false)
 const policyLoading = ref(true)
 const policyError = ref(false)
@@ -136,6 +145,16 @@ onMounted(loadPolicy)
 .product-name { margin: 0 0 12px; color: var(--auth-muted); font-size: 13px; font-weight: 500; line-height: 1.5; }
 .account { max-width: 100%; margin: 12px 0 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .policy-state { align-items: center; flex-wrap: wrap; }
+.initial-password { display: block; }
+.initial-password-value {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--auth-foreground);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 16px;
+  font-weight: 600;
+  user-select: all;
+}
 .form-error { margin: 0 0 20px; color: var(--td-error-color); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .logout { margin-top: 24px; }
 </style>
