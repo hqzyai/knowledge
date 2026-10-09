@@ -39,6 +39,13 @@ user. RBAC must be enabled and Redis available. Replay, body, URL, method,
 content-type, and key binding are enforced before attaching a live web-user
 context. Business ownership and shared-library permissions remain authoritative.
 
+External account provisioning binds identity to the external ID and email, not
+the display name. A new user whose display name is already taken receives a
+username suffixed with their deterministic UUID; retries preserve that username
+even when the upstream display name changes. Reusing an existing email under a
+different external ID remains a conflict and requires an explicit account reset
+or migration by an operator.
+
 The console bridge is installed before ordinary Auth and is activated only by
 `X-AgentOS-Console`. Calls without that header retain the existing JWT/OIDC and
 API-key behavior. It never grants an external API key Full Access or changes its

@@ -198,3 +198,60 @@ func TestProvisionExternalUserRejectsIdentityMutation(t *testing.T) {
 	_, _, err = svc.ProvisionExternalUser(context.Background(), &changed, types.ExternalUserDefaultTenantID)
 	require.ErrorIs(t, err, ErrExternalUserIdentityConflict)
 }
+
+func TestProvisionExternalUsersWithSameDisplayNameStaySeparate(t *testing.T) {
+	repo := newExternalUserRepo()
+	members := newExternalUserMemberService()
+	svc := &userService{userRepo: repo, tenantService: externalUserTenantService{}, memberService: members}
+	firstRequest := &types.ExternalUserCreateRequest{
+		UserID: "first-user", Username: "刘军", Email: "first@example.com", Password: "Example1234",
+	}
+	first, _, err := svc.ProvisionExternalUser(context.Background(), firstRequest, types.ExternalUserDefaultTenantID)
+	require.NoError(t, err)
+	secondRequest := *firstRequest
+	secondRequest.UserID, secondRequest.Email = "second-user", "second@example.com"
+	second, created, err := svc.ProvisionExternalUser(context.Background(), &secondRequest, types.ExternalUserDefaultTenantID)
+	require.NoError(t, err)
+	require.True(t, created)
+	require.NotEqual(t, first.ID, second.ID)
+	require.Equal(t, "刘军-"+second.ID, second.Username)
+	retry, created, err := svc.ProvisionExternalUser(context.Background(), &secondRequest, types.ExternalUserDefaultTenantID)
+	require.NoError(t, err)
+	require.False(t, created)
+	require.Equal(t, second.ID, retry.ID)
+	require.Equal(t, second.Username, retry.Username)
+	require.Len(t, repo.users, 2)
+	require.Len(t, members.members, 2)
+
+	// Reusing somebody else's email still cannot claim their account.
+	secondRequest.Email = first.Email
+	_, _, err = svc.ProvisionExternalUser(context.Background(), &secondRequest, types.ExternalUserDefaultTenantID)
+	require.ErrorIs(t, err, ErrExternalUserIdentityConflict)
+	secondRequest.UserID = "third-user"
+	_, _, err = svc.ProvisionExternalUser(context.Background(), &secondRequest, types.ExternalUserDefaultTenantID)
+	require.ErrorIs(t, err, ErrExternalUserIdentityConflict)
+}
+
+func TestProvisionExternalUserPreservesAccountAfterDisplayNameChange(t *testing.T) {
+	repo := newExternalUserRepo()
+	members := newExternalUserMemberService()
+	svc := &userService{userRepo: repo, tenantService: externalUserTenantService{}, memberService: members}
+	req := &types.ExternalUserCreateRequest{
+		UserID: "stable-id", Username: "Original Name", Email: "stable@example.com", Password: "Example1234",
+	}
+	first, _, err := svc.ProvisionExternalUser(context.Background(), req, types.ExternalUserDefaultTenantID)
+	require.NoError(t, err)
+	repo.users[first.ID].PasswordHash = "changed-password"
+	repo.users[first.ID].Preferences.MustChangePassword = false
+	req.Username = "Changed Name"
+	retry, created, err := svc.ProvisionExternalUser(context.Background(), req, types.ExternalUserDefaultTenantID)
+	require.NoError(t, err)
+	require.False(t, created)
+	require.Equal(t, first.ID, retry.ID)
+	require.Equal(t, first.Username, retry.Username)
+	require.Equal(t, "changed-password", retry.PasswordHash)
+	require.False(t, retry.Preferences.MustChangePassword)
+	repo.users[first.ID].IsActive = false
+	_, _, err = svc.ProvisionExternalUser(context.Background(), req, types.ExternalUserDefaultTenantID)
+	require.ErrorIs(t, err, ErrExternalUserIdentityConflict)
+}

@@ -186,6 +186,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQueryRaw } from 'vue-router'
+import { createSettingsNavigation } from '@/router/settingsNavigation'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { useDeploymentCapabilitiesStore } from '@/stores/deploymentCapabilities'
@@ -230,6 +231,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const settingsNavigation = createSettingsNavigation(router)
 const uiStore = useUIStore()
 const authStore = useAuthStore()
 const deploymentCapabilities = useDeploymentCapabilitiesStore()
@@ -275,7 +277,7 @@ const normalizeSettingsSection = (section: string) => {
 }
 
 const syncSettingsRoute = (sectionKey: string) => {
-  if (route.path !== '/platform/settings') return
+  if (route.path !== '/platform/settings' || settingsNavigation.isClosing()) return
   const query = buildSettingsRouteQuery(sectionKey, route.query)
   if (settingsQueryUnchanged(route.query, query)) return
   void router.replace({
@@ -463,16 +465,15 @@ const handleClose = () => {
     document.activeElement.blur()
   }
   uiStore.closeSettings()
-  // 如果当前路由是设置页，返回上一页
-  if (route.path === '/platform/settings') {
-    const sec = route.query.section
-    if (sec === 'system-global' || sec === 'runtime-queues' || sec === 'platform-api-keys' || sec === 'system-audit-log') {
-      router.push('/platform/knowledge-bases')
-    } else {
-      router.back()
-    }
-  }
+  return settingsNavigation.close()
 }
+
+// Browser Back and in-app navigation must also clear a menu-opened modal.
+watch(() => route.path, (path, previousPath) => {
+  if (previousPath === '/platform/settings' && path !== '/platform/settings') {
+    uiStore.closeSettings()
+  }
+})
 
 // 监听初始导航设置
 watch(() => uiStore.settingsInitialSection, (section) => {
@@ -600,6 +601,7 @@ watch(currentSection, () => {
 })
 
 onUnmounted(() => {
+  settingsNavigation.dispose()
   window.removeEventListener('keydown', handleEscape)
   window.removeEventListener('settings-nav', handleSettingsNav as EventListener)
 })

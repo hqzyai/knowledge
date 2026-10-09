@@ -197,7 +197,7 @@ func (s *knowledgeService) ensureConversationKnowledgeBase(
 			CreatorID:        types.ExternalUserInternalID(tenantID, userID),
 			Visibility:       types.KnowledgeBaseVisibilityPersonal,
 			Name:             conversationKnowledgeBaseName(userID),
-			Description:      "Hermes 自动同步的用户私有对话知识库",
+			Description:      "Agent OS 自动同步的用户私有对话知识库",
 			Type:             types.KnowledgeBaseTypeDocument,
 			EmbeddingModelID: embeddingModelID,
 			SummaryModelID:   summaryModelID,
@@ -428,7 +428,7 @@ func ConversationKnowledgeBaseCandidateIDs(tenantID uint64, userID string) []str
 }
 
 func conversationKnowledgeBaseName(userID string) string {
-	name := "Hermes 对话 · " + userID
+	name := "Agent OS 对话 · " + userID
 	runes := []rune(name)
 	if len(runes) > 200 {
 		name = string(runes[:200])

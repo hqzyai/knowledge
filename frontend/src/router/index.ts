@@ -113,7 +113,9 @@ const router = createRouter({
         {
           path: "settings",
           name: "settings",
-          component: () => import("../views/settings/Settings.vue"),
+          // The platform layout owns the single global settings modal.
+          // Rendering Settings here as well creates duplicate overlays/listeners.
+          component: { render: () => null },
           meta: { requiresInit: true, requiresAuth: true }
         },
         {

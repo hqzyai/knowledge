@@ -323,7 +323,13 @@ func (s *userService) ProvisionExternalUser(
 			return nil, false, lookupErr
 		}
 		if existing, lookupErr := s.userRepo.GetUserByUsername(ctx, username); lookupErr == nil && existing != nil {
-			return nil, false, ErrExternalUserIdentityConflict
+			// External display names are not unique identities. Keep a readable
+			// prefix and the full deterministic UUID within the 50-rune limit.
+			prefix := []rune(username)
+			if len(prefix) > 13 {
+				prefix = prefix[:13]
+			}
+			username = string(prefix) + "-" + internalUserID
 		} else if lookupErr != nil && !errors.Is(lookupErr, apprepo.ErrUserNotFound) {
 			return nil, false, lookupErr
 		}
@@ -357,7 +363,9 @@ func (s *userService) ProvisionExternalUser(
 		}
 	}
 
-	if user.Username != username || !strings.EqualFold(user.Email, email) || user.TenantID != tenantID || !user.IsActive {
+	// The external ID and email bind the identity. A display-name change or
+	// the collision suffix above must not prevent an idempotent retry.
+	if !strings.EqualFold(user.Email, email) || user.TenantID != tenantID || !user.IsActive {
 		return nil, false, ErrExternalUserIdentityConflict
 	}
 
