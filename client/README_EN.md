@@ -16,7 +16,8 @@ The client includes the following main functional modules:
 8. **Model Management**: Create, retrieve, update, and delete models
 9. **Evaluation Function**: Start evaluation tasks and get evaluation results
 10. **Sandbox skills**: Install a skill onto a sandbox config (zip upload, or ClawHub / SkillHub / GitHub source) and configure the environment variables it needs
-11. **Auth**: Login, refresh tokens, and switch the active workspace (`SwitchTenant` records the last-active-tenant preference)
+11. **Long-term memory**: The caller's cross-session memories (settings, items, confirm/reject, topics, document affinity, export, consolidate)
+12. **Auth**: Login, refresh tokens, and switch the active workspace (`SwitchTenant` records the last-active-tenant preference)
 
 ## Usage
 
@@ -87,6 +88,12 @@ metadata := map[string]string{
     "type":   "document",
 }
 knowledge, err := apiClient.CreateKnowledgeFromFile(context.Background(), kb.ID, "path/to/file.pdf", metadata)
+if err != nil {
+    // Handle error
+}
+
+// Download original files from one knowledge base as a ZIP (max 200 IDs, 512 MiB)
+err = apiClient.DownloadKnowledgeFiles(context.Background(), kb.ID, []string{knowledge.ID}, "knowledge-files.zip")
 if err != nil {
     // Handle error
 }

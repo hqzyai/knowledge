@@ -274,7 +274,7 @@ func TestValidateAndGetKnowledgeBase_ReusesDynamicReadGuardAccess(t *testing.T) 
 		Visibility: types.KnowledgeBaseVisibilityWorkspace,
 	}
 	c.Set(middleware.KBAccessContextKey, &middleware.KBAccess{
-		KnowledgeBase: kb, EffectiveTenantID: 1, Permission: types.OrgRoleViewer,
+		KnowledgeBase: kb, Caller: types.CallerFromContext(ctx), EffectiveTenantID: 1, Permission: types.OrgRoleViewer,
 	})
 
 	got, id, tenantID, permission, err := (&KnowledgeBaseHandler{}).validateAndGetKnowledgeBase(c)

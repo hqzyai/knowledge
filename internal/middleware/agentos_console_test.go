@@ -92,7 +92,7 @@ func TestAgentOSConsoleRequestBoundUserAuthorization(t *testing.T) {
 		return "colleague", nil
 	}, cfg), func(c *gin.Context) { c.Status(204) })
 	sharedLookup := &stubKBLookup{kbs: map[string]*types.KnowledgeBase{"shared": {ID: "shared", TenantID: 42, CreatorID: "colleague"}}}
-	sharedGrant := &stubKBShareForGuard{permission: map[string]types.OrgMemberRole{"shared": types.OrgRoleViewer}, shared: map[string]bool{"shared": true}, source: map[string]uint64{"shared": 42}}
+	sharedGrant := &stubKBShareForGuard{permission: map[string]types.OrgMemberRole{"shared": types.OrgRoleViewer}, shared: map[string]bool{"shared": true}}
 	engine.GET("/api/v1/knowledgebase/:kb_id/wiki/stats", RequireKBAccess(KBIDFromParam("kb_id"), types.OrgRoleViewer, sharedLookup, sharedGrant, nil, cfg), func(c *gin.Context) { c.Status(200) })
 	engine.POST("/api/v1/knowledgebase/:kb_id/wiki/auto-fix", RequireKBAccess(KBIDFromParam("kb_id"), types.OrgRoleEditor, sharedLookup, sharedGrant, nil, cfg), func(c *gin.Context) { c.Status(201) })
 	engine.POST("/api/v1/system/admin/users", func(c *gin.Context) { c.Status(201) })

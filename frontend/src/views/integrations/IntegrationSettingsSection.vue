@@ -1,25 +1,95 @@
 <template>
-  <div v-if="tab === 'api'" class="integrations-settings">
-    <div class="integrations-settings__body">
-      <div class="section">
+  <div v-if="isSettingsSectionVisible(`integration-${tab}`)" class="integrations-settings">
+    <div class="integrations-settings__body" :class="{ 'integrations-settings__body--landing': isLandingSection }">
+      <div v-if="tab === 'im'" class="section">
+        <div class="section-header">
+          <h2>{{ $t('agentEditor.im.title') }}</h2>
+          <p class="section-description">
+            {{ $t('agentEditor.im.description') }}
+            <a
+              href="https://github.com/Tencent/WeKnora/blob/main/website-docs/03-features/12-im-integration.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="doc-link"
+            >
+              {{ $t('agentEditor.im.docLink') }}
+              <t-icon name="link" class="link-icon" />
+            </a>
+          </p>
+        </div>
+        <IMChannelPanel v-model:filter-agent-id="filterAgentId" />
+      </div>
+
+      <div v-if="tab === 'embed'" class="section">
+        <div class="section-header">
+          <h2>{{ $t('agentEditor.embed.title') }}</h2>
+          <p class="section-description">{{ $t('agentEditor.embed.description') }}</p>
+        </div>
+        <AgentEmbedChannelPanel v-model:filter-agent-id="filterAgentId" />
+      </div>
+
+      <div v-if="tab === 'api'" class="section">
         <div class="section-header">
           <h2>{{ $t('integrations.api.title') }}</h2>
           <p class="section-description">{{ $t('integrations.api.subtitle') }}</p>
         </div>
         <ApiIntegrationSettings />
       </div>
+
+      <div v-if="tab === 'mcpserver'" class="section">
+        <div class="section-header">
+          <h2>{{ $t('integrations.mcpserver.title') }}</h2>
+          <p class="section-description">{{ $t('integrations.mcpserver.subtitle') }}</p>
+        </div>
+        <McpServerIntegrationSettings />
+      </div>
+
+      <ChromeExtensionLanding v-if="tab === 'chrome'" />
+      <ClawSkillLanding v-if="tab === 'claw'" />
+      <CliIntegrationLanding v-if="tab === 'cli'" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import IMChannelPanel from '@/components/IMChannelPanel.vue'
+import AgentEmbedChannelPanel from '@/components/AgentEmbedChannelPanel.vue'
+import { isSettingsSectionVisible } from '@/config/uiVisibility'
 import ApiIntegrationSettings from '@/views/integrations/ApiIntegrationSettings.vue'
+import McpServerIntegrationSettings from '@/views/integrations/McpServerIntegrationSettings.vue'
+import ChromeExtensionLanding from '@/views/integrations/ChromeExtensionLanding.vue'
+import ClawSkillLanding from '@/views/integrations/ClawSkillLanding.vue'
+import CliIntegrationLanding from '@/views/integrations/CliIntegrationLanding.vue'
 import type { IntegrationTab } from '@/config/integrations'
 
-defineProps<{ tab: IntegrationTab }>()
+const filterAgentId = ref('')
+
+const props = defineProps<{
+  tab: IntegrationTab
+}>()
+
+const route = useRoute()
+
+const isLandingSection = computed(
+  () => props.tab === 'chrome' || props.tab === 'claw' || props.tab === 'cli',
+)
+
+function applyAgentFilterFromRoute() {
+  filterAgentId.value = (route.query.agentId as string) || ''
+}
+
+watch(
+  () => route.query.agentId,
+  applyAgentFilterFromRoute,
+  { immediate: true },
+)
 </script>
 
 <style scoped lang="less">
+@import (reference) '@/components/css/settings-section.less';
+
 .integrations-settings {
   display: flex;
   flex-direction: column;
@@ -34,22 +104,7 @@ defineProps<{ tab: IntegrationTab }>()
 }
 
 .section-header {
-  margin-bottom: 18px;
-
-  h2 {
-    margin: 0 0 6px;
-    color: var(--td-text-color-primary);
-    font-size: 18px;
-    font-weight: 600;
-    line-height: 1.35;
-  }
-}
-
-.section-description {
-  margin: 0;
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.6;
+  .settings-section-header();
 }
 
 .doc-link {
@@ -66,6 +121,6 @@ defineProps<{ tab: IntegrationTab }>()
 }
 
 .link-icon {
-  font-size: 13px;
+  font-size: var(--app-text-md);
 }
 </style>

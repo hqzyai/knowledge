@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Tencent/WeKnora/internal/application/access"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -257,6 +258,13 @@ func TestBuildSearchTargets_SharedAgentScopeRemainsIndependent(t *testing.T) {
 	ctx := context.WithValue(tagTargetContext(), sharedAgentKBVisibilityBypassKey{}, true)
 
 	targets, err := svc.buildSearchTargets(ctx, 100, []string{"doc-kb"}, nil, nil)
+	require.NoError(t, err)
+	require.Empty(t, targets, "the legacy marker alone cannot grant a private KB")
+	kb.TenantID = 200
+	ctx = access.WithSharedAgent(ctx, &types.CustomAgent{TenantID: 200, Config: types.CustomAgentConfig{
+		KBSelectionMode: "selected", KnowledgeBases: []string{"doc-kb"},
+	}})
+	targets, err = svc.buildSearchTargets(ctx, 200, []string{"doc-kb"}, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, targets, 1)
 }

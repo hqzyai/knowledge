@@ -52,7 +52,7 @@ func TestListSkillsHidesThePickerWhenNoSandboxConfigIsSelected(t *testing.T) {
 	lister := &fakeUsableSkillLister{
 		skills: []*types.TenantSkillEntity{{Name: "ppt-generator", Description: "make ppt"}},
 	}
-	router := newChatSkillRouter(NewSkillHandler(lister, nil))
+	router := newChatSkillRouter(NewSkillHandler(lister, nil, nil))
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/skills", nil))
@@ -65,7 +65,7 @@ func TestListSkillsHidesThePickerWhenNoSandboxConfigIsSelected(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	require.True(t, body.Success)
-	require.Empty(t, body.Data, "preloaded and unscoped skills must not appear in @")
+	require.Empty(t, body.Data, "unscoped skills must not appear in @")
 	require.False(t, body.SkillsAvailable)
 	require.Empty(t, lister.configID)
 }
@@ -76,7 +76,7 @@ func TestListSkillsReturnsUsableInstalledSkillsForTheSelectedConfig(t *testing.T
 			{Name: "ppt-generator", Description: "make ppt"},
 		},
 	}
-	router := newChatSkillRouter(NewSkillHandler(lister, nil))
+	router := newChatSkillRouter(NewSkillHandler(lister, nil, nil))
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest(
@@ -102,7 +102,7 @@ func TestListSkillsReturnsUsableInstalledSkillsForTheSelectedConfig(t *testing.T
 
 func TestDownloadWeKnoraSkillEmbedsRequestedBaseURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewSkillHandler(nil, nil)
+	handler := NewSkillHandler(nil, nil, nil)
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	requested := "https://kb.example.com/weknora/api/v1/"

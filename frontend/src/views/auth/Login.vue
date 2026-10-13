@@ -148,7 +148,8 @@ const languageOptions = [
   { value: 'zh-CN', label: '简体中文' },
   { value: 'en-US', label: 'English' },
   { value: 'ru-RU', label: 'Русский' },
-  { value: 'ko-KR', label: '한국어' }
+  { value: 'ko-KR', label: '한국어' },
+  { value: 'ja-JP', label: '日本語' },
 ]
 
 const oidcLoginText = computed(() => {

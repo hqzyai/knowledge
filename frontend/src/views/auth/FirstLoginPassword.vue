@@ -142,8 +142,8 @@ onMounted(loadPolicy)
 
 <style scoped lang="less" src="./auth.less"></style>
 <style scoped lang="less">
-.product-name { margin: 0 0 12px; color: var(--auth-muted); font-size: 13px; font-weight: 500; line-height: 1.5; }
-.account { max-width: 100%; margin: 12px 0 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.product-name { margin: 0 0 12px; color: var(--auth-muted); font-size: var(--app-text-md); font-weight: 500; line-height: 1.5; }
+.account { max-width: 100%; margin: 12px 0 0; font-size: var(--app-text-md); line-height: 1.7; overflow-wrap: anywhere; }
 .policy-state { align-items: center; flex-wrap: wrap; }
 .initial-password { display: block; }
 .initial-password-value {
@@ -151,10 +151,10 @@ onMounted(loadPolicy)
   margin-bottom: 8px;
   color: var(--auth-foreground);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 16px;
+  font-size: var(--app-text-xl);
   font-weight: 600;
   user-select: all;
 }
-.form-error { margin: 0 0 20px; color: var(--td-error-color); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.form-error { margin: 0 0 20px; color: var(--td-error-color); font-size: var(--app-text-md); line-height: 1.6; overflow-wrap: anywhere; }
 .logout { margin-top: 24px; }
 </style>

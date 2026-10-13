@@ -62,8 +62,8 @@ func RegisterChunkRoutes(r *gin.RouterGroup, handler *handler.ChunkHandler, g *r
 // edit/delete any of its documents while a non-owner Contributor gets
 // 403. KB-scoped upload routes (`/knowledge-bases/:id/knowledge/...`)
 // reuse OwnedKBOrAdmin because the URL :id is the KB id directly.
-// Cross-:id batch operations stay Contributor-gated — they don't have
-// a single owning KB to check against.
+// Body-scoped batch operations have a Contributor route gate and resolve
+// their KB ownership plus Editor operation grant inside the handler.
 func RegisterKnowledgeRoutes(r *gin.RouterGroup, handler *handler.KnowledgeHandler, g *rbacGuards) {
 	// System-to-system conversation ingestion performs its KB/document work
 	// internally. At the route boundary any valid API key is sufficient; no
@@ -82,6 +82,8 @@ func RegisterKnowledgeRoutes(r *gin.RouterGroup, handler *handler.KnowledgeHandl
 		kb.POST("/url", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.CreateKnowledgeFromURL)
 		kb.POST("/manual", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.CreateManualKnowledge)
 		kbRead.GET("", g.Viewer(), g.KBAccessRead("id"), handler.ListKnowledge)
+		// 原始文件下载沿用单文件下载的 Contributor + Editor 权限边界。
+		kbRead.POST("/batch-download", g.Contributor(), g.KBAccessWrite("id"), handler.BatchDownloadKnowledge)
 		kbRead.GET("/folders", g.Viewer(), g.KBAccessRead("id"), handler.ListKnowledgeFolders)
 		kb.PUT("/folders", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.RenameKnowledgeFolder)
 		// Clearing all contents under a KB is a destructive op; gate
@@ -225,6 +227,9 @@ func RegisterKnowledgeBaseRoutes(r *gin.RouterGroup, handler *handler.KnowledgeB
 		// （或具备 manage_kbs/full-access 的管理凭证）可切换，并且 handler 会
 		// 再次确认 KB 属于调用方租户，防止共享侧管理员修改源知识库。
 		kbManagement.PUT("/:id/visibility", g.Admin(), g.KBAccessWrite("id"), handler.UpdateKnowledgeBaseVisibility)
+		// 立即重新生成知识库 AI 描述 — 与更新知识库同档鉴权；同步执行一次小模型调用。
+		kbManagement.POST("/:id/profile/generate", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"),
+			handler.GenerateKnowledgeBaseProfile)
 		kbManagement.DELETE("/:id", g.OwnedKBOrAdmin(), g.KBAccessWrite("id"), handler.DeleteKnowledgeBase)
 		// 置顶/取消置顶知识库 — 创建者本人 OR Admin+ 且对 KB 有 write 权限
 		// Pin state is now per-(user, kb) (migration 000050). Anyone with

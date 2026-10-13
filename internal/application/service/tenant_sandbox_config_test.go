@@ -34,6 +34,31 @@ func testGlobalSandboxConfig() *sandbox.Config {
 	return cfg
 }
 
+func TestSandboxConfigHasSecretsIncludesInjectedHeaders(t *testing.T) {
+	cfg := &types.TenantSandboxConfig{
+		Network: &types.SandboxNetworkPolicy{
+			CubeRules: []types.CubeEgressRule{{
+				Inject: []types.CubeHeaderInject{{Secret: "cube-secret"}},
+			}},
+		},
+	}
+	require.True(t, sandboxConfigHasSecrets(cfg))
+
+	cfg.Network.CubeRules = nil
+	cfg.Network.E2BHostRules = []types.E2BHostRule{{
+		Headers: map[string]string{"X-Key": "e2b-secret"},
+	}}
+	require.True(t, sandboxConfigHasSecrets(cfg))
+
+	cfg.Network = &types.SandboxNetworkPolicy{
+		DenyEgressByDefault: true,
+		CubeRules: []types.CubeEgressRule{{
+			Inject: []types.CubeHeaderInject{{Header: "X-Key"}},
+		}},
+	}
+	require.False(t, sandboxConfigHasSecrets(cfg))
+}
+
 func e2bCfg(key, url, domain, template string, ttl int) *types.TenantSandboxConfig {
 	return &types.TenantSandboxConfig{
 		SandboxType: "e2b",
@@ -304,15 +329,19 @@ func (s stubAgentRepo) ListNamesBySandboxConfigID(
 }
 
 type stubProviderClient struct {
-	inventories [][]sandbox.RemoteSandboxSummary
-	templates   []sandbox.RemoteTemplate
-	ensured     *sandbox.RemoteTemplate
+	inventories    [][]sandbox.RemoteSandboxSummary
+	templates      []sandbox.RemoteTemplate
+	ensured        *sandbox.RemoteTemplate
+	ensuredDesktop *sandbox.RemoteTemplate
 	// ensureDelay widens the window in which concurrent provisioning requests
 	// overlap, which is the only way to observe whether they were collapsed.
-	ensureDelay time.Duration
+	ensureDelay      time.Duration
+	ensureDesktopErr error
 
-	ensureCalls  atomic.Int32
-	replaceCalls atomic.Int32
+	ensureCalls         atomic.Int32
+	ensureDesktopCalls  atomic.Int32
+	replaceCalls        atomic.Int32
+	replaceDesktopCalls atomic.Int32
 
 	listCalls        int
 	deleted          []string
@@ -347,6 +376,45 @@ func (s *stubProviderClient) ReplaceStandardTemplate(ctx context.Context) (*sand
 		return &copyTpl, nil
 	}
 	return s.EnsureStandardTemplate(ctx)
+}
+
+func (s *stubProviderClient) EnsureDesktopTemplate(context.Context) (*sandbox.RemoteTemplate, error) {
+	s.ensureDesktopCalls.Add(1)
+	if s.ensureDelay > 0 {
+		time.Sleep(s.ensureDelay)
+	}
+	if s.ensureDesktopErr != nil {
+		return nil, s.ensureDesktopErr
+	}
+	if s.ensuredDesktop != nil {
+		copyTpl := *s.ensuredDesktop
+		return &copyTpl, nil
+	}
+	return &sandbox.RemoteTemplate{ID: "tpl-desktop", Name: "weknora-desktop", Status: "building", Desktop: true}, nil
+}
+
+func (s *stubProviderClient) ReplaceDesktopTemplate(ctx context.Context) (*sandbox.RemoteTemplate, error) {
+	s.replaceDesktopCalls.Add(1)
+	if s.ensureDelay > 0 {
+		time.Sleep(s.ensureDelay)
+	}
+	if s.ensureDesktopErr != nil {
+		return nil, s.ensureDesktopErr
+	}
+	if s.ensuredDesktop != nil {
+		copyTpl := *s.ensuredDesktop
+		return &copyTpl, nil
+	}
+	return s.EnsureDesktopTemplate(ctx)
+}
+
+func (s *stubProviderClient) DeleteSupersededDesktopTemplates(_ context.Context, keepID string) error {
+	for _, item := range s.templates {
+		if item.Desktop && item.ID != "" && item.ID != keepID {
+			s.deletedTemplates = append(s.deletedTemplates, item.ID)
+		}
+	}
+	return nil
 }
 
 func (s *stubProviderClient) DeleteSupersededStandardTemplates(_ context.Context, keepID string) error {
@@ -412,6 +480,79 @@ func TestQueryTemplatesEnsuresMissingWeKnoraTemplate(t *testing.T) {
 	require.Equal(t, "tpl-weknora", result.StandardTemplateID)
 	require.Len(t, result.Templates, 2)
 	require.True(t, result.Templates[0].Standard, "standard template should sort first")
+}
+
+func TestQueryTemplatesEnsuresMissingDesktopTemplate(t *testing.T) {
+	client := &stubProviderClient{
+		templates: []sandbox.RemoteTemplate{
+			{ID: "tpl-weknora", Name: "weknora", Status: "ready", Standard: true},
+		},
+		ensuredDesktop: &sandbox.RemoteTemplate{
+			ID: "tpl-desktop", Name: "weknora-desktop", Status: "building", Desktop: true,
+		},
+	}
+	svc := newTestConfigService(t, &fakeConfigRepo{}, client, stubAgentRepo{})
+
+	result, err := svc.QueryTemplates(context.Background(), 7, SandboxTemplateQueryInput{
+		Config:        e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "", 300),
+		EnsureDesktop: true,
+	})
+
+	require.NoError(t, err)
+	require.True(t, result.Provisioned)
+	require.Equal(t, "tpl-weknora", result.StandardTemplateID)
+	require.Equal(t, "tpl-desktop", result.DesktopTemplateID)
+	require.Equal(t, int32(0), client.ensureCalls.Load(), "creating desktop must not rebuild the CLI template")
+	require.Equal(t, int32(1), client.ensureDesktopCalls.Load())
+	var sawDesktop bool
+	for _, item := range result.Templates {
+		if item.Desktop && item.ID == "tpl-desktop" {
+			sawDesktop = true
+		}
+	}
+	require.True(t, sawDesktop)
+}
+
+func TestQueryTemplatesEnsureDesktopFailureKeepsCatalog(t *testing.T) {
+	client := &stubProviderClient{
+		templates: []sandbox.RemoteTemplate{
+			{ID: "tpl-weknora", Name: "weknora", Status: "ready", Standard: true},
+		},
+		ensureDesktopErr: stderrors.New("hub missing main-desktop"),
+	}
+	svc := newTestConfigService(t, &fakeConfigRepo{}, client, stubAgentRepo{})
+
+	result, err := svc.QueryTemplates(context.Background(), 7, SandboxTemplateQueryInput{
+		Config:        e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "", 300),
+		EnsureDesktop: true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "tpl-weknora", result.StandardTemplateID)
+	require.Empty(t, result.DesktopTemplateID)
+	require.Equal(t, int32(1), client.ensureDesktopCalls.Load())
+	require.Equal(t, 1, len(result.Templates))
+}
+
+func TestQueryTemplatesReplaceDesktopFailureIsFatal(t *testing.T) {
+	stored := e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "tpl-desktop", 300)
+	repo := &fakeConfigRepo{entity: &types.TenantSandboxConfigEntity{
+		ID: "cfg-a", TenantID: 7, SandboxType: "e2b", Config: stored,
+	}}
+	client := &stubProviderClient{
+		templates: []sandbox.RemoteTemplate{
+			{ID: "tpl-desktop", Name: "weknora-desktop", Status: "ready", Desktop: true},
+		},
+		ensureDesktopErr: stderrors.New("rebuild refused"),
+	}
+	svc := newTestConfigService(t, repo, client, stubAgentRepo{})
+
+	_, err := svc.QueryTemplates(context.Background(), 7, SandboxTemplateQueryInput{
+		ConfigID:       "cfg-a",
+		ReplaceDesktop: true,
+	})
+	require.Error(t, err)
+	require.Equal(t, int32(1), client.replaceDesktopCalls.Load())
 }
 
 // Provisioning only becomes idempotent once the build shows up in the
@@ -757,6 +898,29 @@ func TestUpdateRefusesTemplateChangeWhenSkillSnapshotExists(t *testing.T) {
 	_, err := svc.Update(context.Background(), 7, "cfg-a", UpdateSandboxConfigInput{
 		Name:   "prod",
 		Config: e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "t2", 300),
+	})
+	require.ErrorIs(t, err, ErrSkillSnapshotBlocksTemplateChange)
+	require.Nil(t, repo.updated)
+}
+
+func TestUpdateRefusesDesktopEnabledChangeWhenSkillSnapshotExists(t *testing.T) {
+	t.Setenv("SYSTEM_AES_KEY", strings.Repeat("k", 32))
+	stored := e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "t1", 300)
+	stored.SkillImage = &types.SkillImageConfig{SnapshotID: "snap-1"}
+	repo := &fakeConfigRepo{entity: &types.TenantSandboxConfigEntity{
+		ID:          "cfg-a",
+		TenantID:    7,
+		Name:        "prod",
+		SandboxType: "e2b",
+		Config:      stored,
+	}}
+	svc := newTestConfigService(t, repo, &stubProviderClient{}, stubAgentRepo{})
+
+	incoming := e2bCfg("key-a", "https://api.e2b.app", "e2b.app", "t1", 300)
+	incoming.DesktopEnabled = true
+	_, err := svc.Update(context.Background(), 7, "cfg-a", UpdateSandboxConfigInput{
+		Name:   "prod",
+		Config: incoming,
 	})
 	require.ErrorIs(t, err, ErrSkillSnapshotBlocksTemplateChange)
 	require.Nil(t, repo.updated)
@@ -1295,6 +1459,20 @@ func TestSanitizeSandboxConfigPreservesRedactedSecret(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "stored-key", out.E2B.APIKey)
+}
+
+func TestSanitizeSandboxConfigRejectsDomainAllowWithoutDenyAll(t *testing.T) {
+	_, err := SanitizeSandboxConfig(&types.TenantSandboxConfig{
+		SandboxType: "cube",
+		Cube: &types.CubeSandboxConfig{
+			APIURL: "https://cube.example.com", ProxyURL: "https://cube.example.com",
+			SandboxDomain: "cube.app", TemplateID: "tpl-1",
+		},
+		Network: &types.SandboxNetworkPolicy{AllowOut: []string{"api.example.com"}},
+	}, nil)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "0.0.0.0/0")
 }
 
 func TestSanitizeSandboxConfigPreservesSkillImage(t *testing.T) {

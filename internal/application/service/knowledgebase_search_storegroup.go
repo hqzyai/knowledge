@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Tencent/WeKnora/internal/application/access"
 	"github.com/Tencent/WeKnora/internal/application/service/retriever"
 	apperrors "github.com/Tencent/WeKnora/internal/errors"
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -184,9 +185,9 @@ func classifyFactoryError(
 }
 
 // authorizeKBAccess rejects multi-KB searches whose scope includes a KB
-// that the caller is not entitled to read. Same-tenant KBs always pass.
-// Foreign-tenant KBs (Organization-shared) must pass an explicit
-// tenant-scoped permission check via kbShareService.HasTenantKBPermission,
+// that the original caller is not entitled to read. Exact upstream grants
+// support shared KB/agent execution; other foreign KBs need an organization
+// permission check for the caller via access.KBPermissions,
 // applying the 3-D cap (share role + caller's tenant-org role + tenant
 // Viewer cap) introduced in Plan 3 of #1303.
 //
@@ -198,21 +199,20 @@ func classifyFactoryError(
 func (s *knowledgeBaseService) authorizeKBAccess(
 	ctx context.Context,
 	kbs []*types.KnowledgeBase,
-	requestTenantID uint64,
 ) error {
 	if len(kbs) == 0 {
 		return nil
 	}
 
-	callerTenantRole := types.TenantRoleFromContext(ctx)
+	requestTenantID := types.CallerFromContext(ctx).TenantID
+	permissions := access.NewKBPermissions(ctx, s.kbShareService)
 
 	for _, kb := range kbs {
-		if kb.TenantID == requestTenantID {
-			continue
-		}
-		hasPermission, permErr := s.kbShareService.HasTenantKBPermission(
-			ctx, kb.ID, requestTenantID, callerTenantRole, types.OrgRoleViewer)
+		hasPermission, permErr := permissions.CheckKnowledgeBase(kb, types.OrgRoleViewer)
 		if permErr != nil {
+			if _, ok := apperrors.IsAppError(permErr); ok {
+				return permErr
+			}
 			logger.ErrorWithFields(ctx, permErr, map[string]interface{}{
 				"caller_tenant_id": requestTenantID,
 				"kb_tenant_id":     kb.TenantID,
