@@ -76,6 +76,13 @@ func (s *sessionService) AgentQA(
 		return err
 	}
 
+	if len(req.CustomAgent.Config.CallableAgentIDs) > 0 {
+		agentConfig.EmployeeTool, err = s.employeeTool(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Set VLM model ID for tool result image analysis (runtime-only field)
 	if req.CustomAgent != nil && req.CustomAgent.Config.VLMModelID != "" {
 		agentConfig.VLMModelID = req.CustomAgent.Config.VLMModelID

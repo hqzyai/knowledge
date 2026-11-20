@@ -52,6 +52,7 @@ type QuestionOrigin struct {
 // replacing the previous 14-parameter method signatures.
 // EventBus is passed separately to avoid circular dependency with the event package.
 type QARequest struct {
+	Delegated           bool               // A delegated turn answers the parent without starting another delegation.
 	Session             *Session           // The conversation session
 	Query               string             // User query text
 	AssistantMessageID  string             // Pre-created assistant message ID

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/agent/compaction"
+	"github.com/Tencent/WeKnora/internal/agent/tools"
 	"github.com/Tencent/WeKnora/internal/browserskill"
 	"github.com/Tencent/WeKnora/internal/types"
 	"github.com/google/uuid"
@@ -84,6 +85,9 @@ func toolExecutionTimeout(toolName string, arguments ...string) time.Duration {
 		if json.Unmarshal([]byte(arguments[0]), &input) == nil && browserskill.IsHumanStep(input.Method) {
 			return browserskill.HumanStepTimeout
 		}
+	}
+	if toolName == tools.ToolCallEmployee {
+		return 4*time.Minute + 5*time.Second
 	}
 	if toolName == "shell_exec" {
 		return shellExecToolTimeout

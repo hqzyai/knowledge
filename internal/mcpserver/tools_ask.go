@@ -6,21 +6,15 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
-	"github.com/Tencent/WeKnora/internal/event"
-	"github.com/Tencent/WeKnora/internal/logger"
+	"github.com/Tencent/WeKnora/internal/agentturn"
 	"github.com/Tencent/WeKnora/internal/types"
-	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 const (
-	askTimeout             = 4 * time.Minute
-	askCompleteWaitTimeout = 15 * time.Second
-	askSessionTitleMaxLen  = 60
-	askChannel             = "mcp"
+	askSessionTitleMaxLen = 60
+	askChannel            = "mcp"
 )
 
 func askTool() mcp.Tool {
@@ -83,7 +77,10 @@ func (s *Server) handleAsk(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	answer, refs, err := s.runQA(ctx, session, agent, question, kbIDs)
+	answer, rawRefs, err := agentturn.Run(ctx, s.sessionService, s.messageService, &types.QARequest{
+		Session: session, CustomAgent: agent, Query: question, KnowledgeBaseIDs: kbIDs,
+	}, askChannel)
+	refs := summarizeReferences(rawRefs)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to answer", err), nil
 	}
@@ -206,210 +203,6 @@ func (s *Server) resolveAskSession(
 	}
 	created.UserID = ownerID
 	return created, nil
-}
-
-// runQA executes one turn synchronously and returns the final answer and
-// the references it cited. It mirrors the IM channel's non-streaming path.
-func (s *Server) runQA(
-	ctx context.Context, session *types.Session, agent *types.CustomAgent, question string, kbIDs []string,
-) (string, []askReference, error) {
-	ctx, cancel := context.WithTimeout(ctx, askTimeout)
-	defer cancel()
-
-	requestID := uuid.New().String()
-	userMsg, err := s.messageService.CreateMessage(ctx, &types.Message{
-		SessionID:   session.ID,
-		Role:        "user",
-		Content:     question,
-		RequestID:   requestID,
-		CreatedAt:   time.Now(),
-		IsCompleted: true,
-		Channel:     askChannel,
-	})
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create user message: %w", err)
-	}
-	assistantMsg, err := s.messageService.CreateMessage(ctx, &types.Message{
-		SessionID:   session.ID,
-		Role:        "assistant",
-		RequestID:   requestID,
-		CreatedAt:   time.Now(),
-		IsCompleted: false,
-		Channel:     askChannel,
-	})
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create assistant message: %w", err)
-	}
-
-	var (
-		mu       sync.Mutex
-		answer   strings.Builder
-		final    string
-		refs     []*types.SearchResult
-		qaErr    error
-		done     = make(chan struct{})
-		complete = make(chan struct{})
-		doneOnce sync.Once
-		compOnce sync.Once
-	)
-	closeDone := func() { doneOnce.Do(func() { close(done) }) }
-	closeComplete := func() { compOnce.Do(func() { close(complete) }) }
-
-	bus := event.NewEventBus()
-	bus.On(event.EventAgentFinalAnswer, func(_ context.Context, evt event.Event) error {
-		data, ok := evt.Data.(event.AgentFinalAnswerData)
-		if !ok {
-			return nil
-		}
-		mu.Lock()
-		answer.WriteString(data.Content)
-		mu.Unlock()
-		if data.Done {
-			closeDone()
-		}
-		return nil
-	})
-	bus.On(event.EventAgentReferences, func(_ context.Context, evt event.Event) error {
-		data, ok := evt.Data.(event.AgentReferencesData)
-		if !ok {
-			return nil
-		}
-		mu.Lock()
-		collectReferences(&refs, data.References)
-		mu.Unlock()
-		return nil
-	})
-	bus.On(event.EventAgentComplete, func(_ context.Context, evt event.Event) error {
-		data, ok := evt.Data.(event.AgentCompleteData)
-		if !ok {
-			return nil
-		}
-		mu.Lock()
-		if data.FinalAnswer != "" {
-			final = data.FinalAnswer
-		}
-		if len(data.KnowledgeRefs) > 0 {
-			var completeRefs []*types.SearchResult
-			collectReferences(&completeRefs, data.KnowledgeRefs)
-			if len(completeRefs) > 0 {
-				refs = completeRefs
-			}
-		}
-		mu.Unlock()
-		closeComplete()
-		return nil
-	})
-	bus.On(event.EventError, func(_ context.Context, evt event.Event) error {
-		data, ok := evt.Data.(event.ErrorData)
-		if !ok {
-			return nil
-		}
-		mu.Lock()
-		qaErr = fmt.Errorf("%s", data.Error)
-		mu.Unlock()
-		closeDone()
-		closeComplete()
-		return nil
-	})
-
-	useAgent := agent.IsAgentMode()
-	go func() {
-		if useAgent {
-			defer closeDone()
-			defer closeComplete()
-		}
-		req := &types.QARequest{
-			Session:            session,
-			Query:              question,
-			AssistantMessageID: assistantMsg.ID,
-			UserMessageID:      userMsg.ID,
-			CustomAgent:        agent,
-			KnowledgeBaseIDs:   kbIDs,
-			// Web search is never enabled from the MCP surface: the builtin
-			// quick-answer agent turns it on by default, which would make an
-			// otherwise read-only endpoint reach the public internet.
-			WebSearchEnabled: false,
-		}
-		var runErr error
-		if useAgent {
-			runErr = s.sessionService.AgentQA(ctx, req, bus)
-		} else {
-			runErr = s.sessionService.KnowledgeQA(ctx, req, bus)
-		}
-		if runErr != nil {
-			mu.Lock()
-			if qaErr == nil {
-				qaErr = runErr
-			}
-			mu.Unlock()
-			closeDone()
-			closeComplete()
-		}
-	}()
-
-	select {
-	case <-done:
-		if useAgent {
-			timer := time.NewTimer(askCompleteWaitTimeout)
-			select {
-			case <-complete:
-			case <-ctx.Done():
-			case <-timer.C:
-				logger.Warnf(ctx, "[mcpserver] ask timed out waiting for agent completion: session=%s", session.ID)
-			}
-			timer.Stop()
-		}
-	case <-ctx.Done():
-		assistantMsg.Content = "The answer was interrupted before completion."
-		assistantMsg.IsCompleted = true
-		if updateErr := s.messageService.UpdateMessage(context.WithoutCancel(ctx), assistantMsg); updateErr != nil {
-			logger.Warnf(ctx, "[mcpserver] failed to finalize interrupted message: %v", updateErr)
-		}
-		return "", nil, fmt.Errorf("answer timed out: %w", ctx.Err())
-	}
-
-	mu.Lock()
-	text := answer.String()
-	if strings.TrimSpace(text) == "" && final != "" {
-		text = final
-	}
-	collected := append([]*types.SearchResult(nil), refs...)
-	runErr := qaErr
-	mu.Unlock()
-
-	if strings.TrimSpace(text) == "" && runErr != nil {
-		assistantMsg.Content = "The answer failed: " + runErr.Error()
-		assistantMsg.IsCompleted = true
-		if updateErr := s.messageService.UpdateMessage(context.WithoutCancel(ctx), assistantMsg); updateErr != nil {
-			logger.Warnf(ctx, "[mcpserver] failed to finalize failed message: %v", updateErr)
-		}
-		return "", nil, runErr
-	}
-	if strings.TrimSpace(text) == "" {
-		text = "No answer could be produced for this question."
-	}
-	assistantMsg.Content = text
-	assistantMsg.IsCompleted = true
-	if len(collected) > 0 {
-		assistantMsg.KnowledgeReferences = types.References(collected)
-	}
-	if err := s.messageService.UpdateMessage(context.WithoutCancel(ctx), assistantMsg); err != nil {
-		logger.Warnf(ctx, "[mcpserver] failed to persist assistant message: %v", err)
-	}
-	return text, summarizeReferences(collected), nil
-}
-
-func collectReferences(dst *[]*types.SearchResult, raw interface{}) {
-	switch v := raw.(type) {
-	case []*types.SearchResult:
-		*dst = append(*dst, v...)
-	case []interface{}:
-		for _, item := range v {
-			if sr, ok := item.(*types.SearchResult); ok {
-				*dst = append(*dst, sr)
-			}
-		}
-	}
 }
 
 const askExcerptMaxRunes = 300

@@ -211,6 +211,9 @@ func (s *agentService) CreateAgentEngine(
 	if err := s.registerTools(ctx, toolRegistry, config, rerankModel, chatModel, sessionID); err != nil {
 		return nil, fmt.Errorf("failed to register tools: %w", err)
 	}
+	if config.EmployeeTool != nil {
+		toolRegistry.RegisterTool(config.EmployeeTool)
+	}
 	s.registerMCPTools(ctx, toolRegistry, config)
 
 	// Register the shell first: file discovery needs a separate tool only

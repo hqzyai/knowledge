@@ -14,6 +14,7 @@ import (
 // not, because a newly added tool would opt out by accident.
 func TestEveryBuiltInToolDeclaresAModelHandlePolicy(t *testing.T) {
 	builtIns := []string{
+		ToolCallEmployee,
 		ToolDiscoverMCPTools,
 		ToolCallMCPTool,
 		ToolThinking,

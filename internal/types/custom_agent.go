@@ -170,6 +170,8 @@ type CustomAgentConfig struct {
 	LLMCallTimeout int `yaml:"llm_call_timeout" json:"llm_call_timeout,omitempty"`
 	// Allowed tools (only for agent type)
 	AllowedTools []string `yaml:"allowed_tools" json:"allowed_tools"`
+	// Workspace employees this agent may ask to complete a delegated task.
+	CallableAgentIDs []string `yaml:"callable_agent_ids,omitempty" json:"callable_agent_ids,omitempty"`
 	// MCP service selection mode: "all" = all enabled MCP services, "selected" = specific services, "none" = no MCP
 	MCPSelectionMode string `yaml:"mcp_selection_mode" json:"mcp_selection_mode"`
 	// Selected MCP service IDs (only used when MCPSelectionMode is "selected")

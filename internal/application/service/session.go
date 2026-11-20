@@ -110,7 +110,9 @@ func generateEventID(suffix string) string {
 // (see service.LoadAgentHistory and chat_pipeline history loading) — there is no
 // separate cross-turn cache layer.
 type sessionService struct {
-	cfg                   *config.Config                         // Application configuration
+	cfg                   *config.Config // Application configuration
+	customAgents          interfaces.CustomAgentRepository
+	turnMessages          interfaces.MessageService
 	sessionRepo           interfaces.SessionRepository           // Repository for session data
 	messageRepo           interfaces.MessageRepository           // Repository for message data
 	knowledgeBaseService  interfaces.KnowledgeBaseService        // Service for knowledge base operations
@@ -144,6 +146,8 @@ type sessionService struct {
 
 // NewSessionService creates a new session service instance with all required dependencies
 func NewSessionService(cfg *config.Config,
+	customAgents interfaces.CustomAgentRepository,
+	turnMessages interfaces.MessageService,
 	sessionRepo interfaces.SessionRepository,
 	messageRepo interfaces.MessageRepository,
 	knowledgeBaseService interfaces.KnowledgeBaseService,
@@ -169,6 +173,8 @@ func NewSessionService(cfg *config.Config,
 ) interfaces.SessionService {
 	return &sessionService{
 		cfg:                   cfg,
+		customAgents:          customAgents,
+		turnMessages:          turnMessages,
 		sessionRepo:           sessionRepo,
 		messageRepo:           messageRepo,
 		knowledgeBaseService:  knowledgeBaseService,

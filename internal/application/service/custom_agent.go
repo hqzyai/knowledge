@@ -115,6 +115,9 @@ func (s *customAgentService) CreateAgent(ctx context.Context, agent *types.Custo
 	if err := agent.Config.QuestionSuggestions.Validate(); err != nil {
 		return nil, err
 	}
+	if err := validateCallableAgents(ctx, s.repo, tenantID, agent); err != nil {
+		return nil, err
+	}
 	if err := s.validateAgentKnowledgeBaseVisibility(ctx, agent.Config); err != nil {
 		return nil, err
 	}
@@ -272,6 +275,9 @@ func (s *customAgentService) UpdateAgent(
 	tenantID, ok := types.TenantIDFromContext(ctx)
 	if !ok {
 		return nil, ErrInvalidTenantID
+	}
+	if err := validateCallableAgents(ctx, s.repo, tenantID, agent); err != nil {
+		return nil, err
 	}
 	if err := s.validateAgentKnowledgeBaseVisibility(ctx, agent.Config); err != nil {
 		return nil, err

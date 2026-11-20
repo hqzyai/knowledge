@@ -106,6 +106,7 @@ type AgentConfig struct {
 	// a negative value is unlimited — the loop runs until the model stops,
 	// the user cancels, or another guard fires. See UnlimitedMaxIterations.
 	MaxIterations  int      `json:"max_iterations"`
+	EmployeeTool   Tool     `json:"-" yaml:"-"`              // Bound to the authenticated caller for this turn.
 	AllowedTools   []string `json:"allowed_tools"`           // List of allowed tool names
 	Temperature    float64  `json:"temperature"`             // LLM temperature for agent
 	KnowledgeBases []string `json:"knowledge_bases"`         // Accessible knowledge base IDs

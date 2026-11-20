@@ -80,6 +80,22 @@
           </div>
 
           <!-- 智能体类型（仅智能推理模式下显示） -->
+          <div v-if="isAgentMode" class="setting-row" data-agent-field="callable_agent_ids">
+            <div class="setting-info">
+              <label>{{ $t('agent.editor.callableEmployees') }}</label>
+              <p class="desc">{{ $t('agent.editor.callableEmployeesHint') }}</p>
+            </div>
+            <div class="setting-control">
+              <t-select v-model="formData.config.callable_agent_ids" multiple filterable clearable
+                :aria-label="$t('agent.editor.callableEmployees')" :disabled="readOnly || employeesLoading || employeesFailed"
+                :loading="employeesLoading" :max="24" :options="employeeOptions" :min-collapsed-num="2"
+                :empty="$t('agent.editor.noCallableEmployees')" />
+              <t-button v-if="employeesFailed" size="small" variant="text" @click="loadEmployees(true)">
+                {{ $t('agent.editor.retryEmployees') }}
+              </t-button>
+            </div>
+          </div>
+
           <div v-if="isAgentMode && agentTypePresets.length > 0" class="setting-row setting-row--emphasize"
             data-guide="agent-create-agent-type">
             <div class="setting-info">
@@ -2794,6 +2810,7 @@ const defaultFormData = {
     max_iterations: 10,
     llm_call_timeout: 120,  // 120 seconds
     allowed_tools: [] as string[],
+    callable_agent_ids: [] as string[],
     reflection_enabled: false,
     // MCP 服务设置
     mcp_selection_mode: 'none' as 'all' | 'selected' | 'none',
@@ -2930,6 +2947,34 @@ const agentMode = computed({
 });
 
 const isAgentMode = computed(() => agentMode.value === 'smart-reasoning');
+
+const employeeChoices = ref<CustomAgent[]>([]);
+const employeesLoading = ref(false);
+const employeesFailed = ref(false);
+const employeeOptions = computed(() => employeeChoices.value
+  .filter(agent => !agent.is_builtin && agent.id !== editorAgent.value?.id)
+  .map(agent => ({ value: agent.id, label: agent.name })));
+
+let employeeLoadGeneration = 0;
+async function loadEmployees(force = false) {
+  const generation = ++employeeLoadGeneration;
+  employeesLoading.value = true;
+  employeesFailed.value = false;
+  try {
+    const result = await chatResources.fetchAgentsForList({ creator: 'all' }, force);
+    if (generation === employeeLoadGeneration) employeeChoices.value = result.data;
+  } catch {
+    if (generation === employeeLoadGeneration) {
+      employeeChoices.value = [];
+      employeesFailed.value = true;
+    }
+  } finally {
+    if (generation === employeeLoadGeneration) employeesLoading.value = false;
+  }
+}
+watch(() => props.visible && isAgentMode.value && currentSection.value === 'basic', active => {
+  if (active) void loadEmployees();
+}, { immediate: true });
 
 const effectiveDefaultMaxCompletionTokens = computed(() =>
   defaultMaxCompletionTokensFor(agentMode.value, formData.value.config.sandbox_config_id),
@@ -3529,6 +3574,7 @@ watch(() => props.visible, async (val) => {
         },
       };
       // 确保数组字段存在
+      agentData.config.callable_agent_ids ??= [];
       if (!agentData.config.knowledge_bases) agentData.config.knowledge_bases = [];
       // 旧配置里可能还带着已合并的工具名（knowledge_search / grep_chunks /
       // list_knowledge_chunks / get_document_info / wiki_read_source_doc），
