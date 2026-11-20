@@ -76,8 +76,9 @@ func (s *sessionService) AgentQA(
 		return err
 	}
 
-	if len(req.CustomAgent.Config.CallableAgentIDs) > 0 {
-		agentConfig.EmployeeTool, err = s.employeeTool(ctx, req)
+	if !req.DisableEmployeeDelegation &&
+		(req.CustomAgent.ID == types.BuiltinEmployeeRouterID || len(req.CustomAgent.Config.CallableAgentIDs) > 0) {
+		agentConfig.EmployeeTool, err = s.employeeTool(ctx, req, eventBus)
 		if err != nil {
 			return err
 		}

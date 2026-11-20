@@ -60,7 +60,8 @@ type CreateKnowledgeQARequest struct {
 	SkillNames            []string                     `json:"skill_names"`                           // Per-request Skills selected via @mention
 	TagIDs                []string                     `json:"tag_ids"`                               // @mentioned tag IDs (display/debug; scoped via MentionedItems)
 	MentionedItems        []MentionedItemRequest       `json:"mentioned_items"`                       // @mentioned knowledge bases and files
-	DisableTitle          bool                         `json:"disable_title"`                         // Whether to disable auto title generation
+	DisableTitle              bool                         `json:"disable_title"`                         // Whether to disable auto title generation
+	DisableEmployeeDelegation bool                         `json:"disable_employee_delegation,omitempty"` // Keep a pinned single-employee chat from delegating to other employees
 	Images                []ImageAttachment            `json:"images"`                                // Attached images for multimodal chat
 	AttachmentUploads     []AttachmentUpload           `json:"attachment_uploads,omitempty"`          // Attached files (documents, audio, etc.)
 	AttachmentIDs         []string                     `json:"attachment_ids,omitempty"`              // Pre-uploaded session-scoped document IDs

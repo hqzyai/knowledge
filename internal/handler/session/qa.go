@@ -83,8 +83,9 @@ type qaRequestContext struct {
 	// Snapshot of the request fields needed to persist the input-bar state
 	// for session restoration. Kept verbatim from the request so we record
 	// what the user had selected on the UI (not server-side resolutions).
-	reqAgentEnabled bool
-	reqAgentID      string
+	reqAgentEnabled           bool
+	reqAgentID                string
+	disableEmployeeDelegation bool
 
 	// skipSSE is set for server-started follow-up runs (steer backlog after
 	// the previous turn exits). Events still land in StreamManager so the
@@ -112,8 +113,9 @@ func (rc *qaRequestContext) buildQARequest() *types.QARequest {
 		SummaryModelID:      rc.summaryModelID,
 		RequestChatModel:    rc.requestChatModel,
 		ReasoningEffort:     rc.reasoningEffort,
-		CustomAgent:         rc.customAgent,
-		SharedAgentReadOnly: rc.sharedAgentReadOnly,
+		CustomAgent:               rc.customAgent,
+		DisableEmployeeDelegation: rc.disableEmployeeDelegation,
+		SharedAgentReadOnly:       rc.sharedAgentReadOnly,
 		KnowledgeBaseIDs:    rc.knowledgeBaseIDs,
 		KnowledgeIDs:        rc.knowledgeIDs,
 		TagScopes:           rc.tagScopes,
@@ -493,9 +495,10 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 		attachmentMetas:       attachmentMetas,
 		suggestionAttribution: request.SuggestionAttribution,
 		questionOrigin:        request.QuestionOrigin,
-		reqAgentEnabled:       request.AgentEnabled,
-		reqAgentID:            request.AgentID,
-		resourceRewriter:      resourceRewriter,
+		reqAgentEnabled:           request.AgentEnabled,
+		reqAgentID:                request.AgentID,
+		disableEmployeeDelegation: request.DisableEmployeeDelegation,
+		resourceRewriter:          resourceRewriter,
 	}
 
 	return reqCtx, &request, nil

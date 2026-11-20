@@ -30,6 +30,9 @@ const (
 	BuiltinWikiFixerID = "builtin-wiki-fixer"
 	// BuiltinSkillInstallerID is the ID for the built-in skill installer agent
 	BuiltinSkillInstallerID = "builtin-skill-installer"
+	// BuiltinEmployeeRouterID is the internal orchestrator that automatically
+	// discovers and dispatches user questions to matching digital employees.
+	BuiltinEmployeeRouterID = "builtin-employee-router"
 )
 
 // AgentMode constants for agent running mode
@@ -641,10 +644,49 @@ type SuggestedQuestion struct {
 	KnowledgeID string `json:"knowledge_id,omitempty"`
 }
 
+// DefaultEmployeeRouterPrompt is the fallback orchestrator prompt used when
+// builtin-employee-router is invoked without a YAML override.
+const DefaultEmployeeRouterPrompt = `你是 AgentOS 数字员工的智能调度中枢（Orchestrator）。
+你的职责是理解用户的问题，查看 call_employee 工具中列出的所有可用数字员工及其专长描述，并自动将问题调度给最匹配的数字员工处理。
+
+工作原则：
+1. 凡是涉及具体业务、企业知识、流程制度、专业领域的问题，直接调用 call_employee 调度最匹配的数字员工来回答，不要在调用前输出“我将分别咨询…”等过渡性旁白。
+2. 如果问题跨越多个领域，可在同一轮中按需调用多位对应领域的数字员工，并在 question 参数中提供清晰、简洁、自包含的问题。
+3. 每位数字员工在单轮对话中最多调用 1 次，绝不重复重试同一位员工，也不要为了凑答案去调用无关助手。
+4. 收到数字员工的回复后，立即用与用户一致的语言进行清晰、结构化的汇总和呈现，保留关键事实、步骤和依据；如果某位助手反馈知识库中暂无相关制度，如实告知用户即可。
+5. 如果用户只是打招呼、闲聊或询问“有哪些助手/你能做什么”，直接友好回答并简要介绍当前可调度的数字员工。`
+
+// newDefaultEmployeeRouterAgent builds the built-in employee router agent.
+func newDefaultEmployeeRouterAgent(tenantID uint64) *CustomAgent {
+	agent := &CustomAgent{
+		ID:          BuiltinEmployeeRouterID,
+		Name:        "智能调度",
+		Description: "自动分析问题并调度最合适的数字员工协同解答",
+		Avatar:      "✦",
+		IsBuiltin:   true,
+		TenantID:    tenantID,
+		Config: CustomAgentConfig{
+			AgentMode:        AgentModeSmartReasoning,
+			AgentType:        AgentTypeCustom,
+			SystemPrompt:     DefaultEmployeeRouterPrompt,
+			Temperature:      0.3,
+			MaxIterations:    4,
+			KBSelectionMode:  "none",
+			AllowedTools:     []string{},
+			MultiTurnEnabled: true,
+			WebSearchEnabled: false,
+		},
+	}
+	agent.EnsureDefaults()
+	return agent
+}
+
 // BuiltinAgentRegistry provides a registry of all built-in agents.
-// It is initialised empty and populated by LoadBuiltinAgentsConfig from
-// config/builtin_agents.yaml at startup via rebuildRegistryFromConfig.
-var BuiltinAgentRegistry = map[string]func(uint64) *CustomAgent{}
+// It is initialised with internal fallbacks and populated by LoadBuiltinAgentsConfig
+// from config/builtin_agents.yaml at startup via rebuildRegistryFromConfig.
+var BuiltinAgentRegistry = map[string]func(uint64) *CustomAgent{
+	BuiltinEmployeeRouterID: newDefaultEmployeeRouterAgent,
+}
 
 // builtinAgentIDsOrdered defines the fixed display order of built-in agents
 // that are exposed in the user-facing agent list (ListAgents).

@@ -98,6 +98,9 @@ func rebuildRegistryFromConfig() {
 			return buildAgentFromEntry(agentID, tenantID, "")
 		}
 	}
+	if _, exists := BuiltinAgentRegistry[BuiltinEmployeeRouterID]; !exists {
+		BuiltinAgentRegistry[BuiltinEmployeeRouterID] = newDefaultEmployeeRouterAgent
+	}
 }
 
 // ---------------------------------------------------------------------------

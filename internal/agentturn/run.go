@@ -164,9 +164,9 @@ func Run(ctx context.Context, sessions interfaces.SessionService, messages inter
 	}
 
 	mu.Lock()
-	text := answer.String()
-	if strings.TrimSpace(text) == "" && final != "" {
-		text = final
+	text := strings.TrimSpace(final)
+	if text == "" {
+		text = answer.String()
 	}
 	collected := append([]*types.SearchResult(nil), refs...)
 	runErr := qaErr
