@@ -151,9 +151,11 @@ func (t *employeeTool) Execute(ctx context.Context, raw json.RawMessage) (*types
 	if err != nil {
 		return nil, err
 	}
-	child := &types.QARequest{Session: session, Query: question, CustomAgent: target, Delegated: true}
-	if target.Config.ModelID == "" {
-		child.RequestChatModel = t.requestModel
+	// A delegated answer belongs to the same caller-selected model route as the
+	// parent turn. A nil override lets resolveChatModelID use the target's model.
+	child := &types.QARequest{
+		Session: session, Query: question, CustomAgent: target, Delegated: true,
+		RequestChatModel: t.requestModel,
 	}
 	answer, _, err := agentturn.Run(ctx, t.sessions, t.messages, child, "employee")
 	if err != nil {

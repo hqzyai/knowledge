@@ -87,7 +87,17 @@ func TestCallEmployee(t *testing.T) {
 	b.Config.ModelID = "configured"
 	_, err = call("b")
 	require.NoError(t, err)
+	require.Same(t, req.RequestChatModel, runner.turn.RequestChatModel)
+	require.Equal(t, "configured", runner.turn.CustomAgent.Config.ModelID)
+
+	req.RequestChatModel = nil
+	tool, err = s.employeeTool(ctx, req)
+	require.NoError(t, err)
+	tool.(*employeeTool).sessions = runner
+	_, err = call("b")
+	require.NoError(t, err)
 	require.Nil(t, runner.turn.RequestChatModel)
+	require.Equal(t, "configured", runner.turn.CustomAgent.Config.ModelID)
 	a.Config.CallableAgentIDs = nil
 	_, err = call("b")
 	require.Error(t, err)
